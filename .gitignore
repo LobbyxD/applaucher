@@ -1,0 +1,26 @@
+# --- Python cache / build files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- PyInstaller build outputs ---
+/build/
+/dist/
+*.spec
+
+# --- Virtual environments ---
+.venv/
+env/
+venv/
+
+# --- Logs & temp files ---
+*.log
+*.tmp
+
+# --- OS-specific junk ---
+.DS_Store
+Thumbs.db
+
+# --- Local user data (do not commit per-user app settings) ---
+/AppData/
+/data.json

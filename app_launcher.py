@@ -1,0 +1,213 @@
+import os
+import sys
+import json
+import tkinter as tk
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+from launcher_logic import run_launch_sequence
+import threading
+import asyncio
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and PyInstaller build."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def get_appdata_dir():
+    """Return %APPDATA%\App Launcher and create it if missing."""
+    base = os.path.join(os.getenv("APPDATA"), "App Launcher")
+    os.makedirs(base, exist_ok=True)
+    return base
+
+DATA_FILE = os.path.join(get_appdata_dir(), "data.json")
+
+def load_launches():
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_launches(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+# ---------- Add/Edit window ----------
+class LaunchEditor(ctk.CTkToplevel):
+    def __init__(self, master, on_save, existing=None):
+        super().__init__(master)
+        self.title("Add / Edit Launch")
+        self.geometry("700x500")
+        self.on_save = on_save
+        self.paths = existing["paths"][:] if existing else []
+        self.name_var = tk.StringVar(value=existing["name"] if existing else "")
+        self.build_ui()
+
+    def build_ui(self):
+        ctk.CTkLabel(self, text="App Launch Name:", anchor="w").pack(fill="x", padx=10, pady=(10, 0))
+        ctk.CTkEntry(self, textvariable=self.name_var).pack(fill="x", padx=10, pady=5)
+
+        self.frame_paths = ctk.CTkScrollableFrame(self)
+        self.frame_paths.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for p in self.paths:
+            self._add_path_row(p)
+        ctk.CTkButton(self, text="➕ Add Path", command=lambda: self._add_path_row()).pack(pady=4)
+
+        btns = ctk.CTkFrame(self)
+        btns.pack(fill="x", pady=6)
+        ctk.CTkButton(btns, text="💾 Save", command=self.save).pack(side="left", padx=10)
+        ctk.CTkButton(btns, text="Cancel", fg_color="gray", command=self.destroy).pack(side="right", padx=10)
+
+    def _add_path_row(self, p=None):
+        row = ctk.CTkFrame(self.frame_paths)
+        row.pack(fill="x", pady=4, padx=5)
+        path_var = tk.StringVar(value=p["path"] if p else "")
+        delay_var = tk.StringVar(value=str(p["delay"] if p else 0))
+        option_var = tk.StringVar(value=p["start_option"] if p else "Not Maximized")
+
+        ctk.CTkEntry(row, textvariable=path_var, width=360).pack(side="left", padx=5)
+        ctk.CTkButton(row, text="📁", width=30,
+                      command=lambda: self._choose_file(path_var)).pack(side="left", padx=3)
+        ctk.CTkLabel(row, text="Delay:").pack(side="left")
+        ctk.CTkEntry(row, textvariable=delay_var, width=50).pack(side="left", padx=5)
+        ctk.CTkOptionMenu(row, values=["Not Maximized","Maximized","Minimized"],
+                          variable=option_var).pack(side="left", padx=5)
+        ctk.CTkButton(row, text="🗑", width=30,
+                      fg_color="red", command=row.destroy).pack(side="left", padx=5)
+
+        row.path_var = path_var
+        row.delay_var = delay_var
+        row.option_var = option_var
+
+    def _choose_file(self, var):
+        path = filedialog.askopenfilename(title="Choose Executable", filetypes=[("EXE Files","*.exe"),("All","*.*")])
+        if path:
+            var.set(path)
+
+    def save(self):
+        name = self.name_var.get().strip() or "Untitled"
+        apps = []
+        for child in self.frame_paths.winfo_children():
+            p = child.path_var.get().strip()
+            if not p: continue
+            try:
+                delay = float(child.delay_var.get() or 0)
+            except ValueError:
+                delay = 0
+            apps.append({
+                "path": p,
+                "delay": delay,
+                "start_option": child.option_var.get()
+            })
+        if not apps:
+            messagebox.showwarning("Empty", "Please add at least one path.")
+            return
+        self.on_save({"name": name, "paths": apps})
+        self.destroy()
+
+# ---------- Main App ----------
+class AppLauncher(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self._launching = False
+        self.title("Modern App Launcher")
+        self.geometry("700x600")
+        ctk.set_default_color_theme("dark-blue")
+        self.launches = load_launches()
+        self.loop = asyncio.new_event_loop()
+        self.build_ui()
+
+    def build_ui(self):
+        top = ctk.CTkFrame(self)
+        top.pack(fill="x", pady=10)
+        ctk.CTkLabel(top, text="App Launches", font=ctk.CTkFont(size=20, weight="bold")).pack(side="left", padx=10)
+        ctk.CTkButton(top, text="➕ Add Launch", command=self.add_launch).pack(side="right", padx=10)
+
+        self.list_frame = ctk.CTkScrollableFrame(self)
+        self.list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.log_box = ctk.CTkTextbox(self, height=100)
+        self.log_box.pack(fill="x", padx=10, pady=(0,10))
+        self.refresh_list()
+
+    def refresh_list(self):
+        for child in self.list_frame.winfo_children():
+            child.destroy()
+        for i, launch in enumerate(self.launches):
+            self._add_launch_card(launch, i)
+
+    def _add_launch_card(self, launch, index):
+        card = ctk.CTkFrame(self.list_frame)
+        card.pack(fill="x", pady=5, padx=5)
+        ctk.CTkLabel(card, text=launch["name"], font=ctk.CTkFont(size=16, weight="bold")).pack(side="left", padx=10)
+        ctk.CTkLabel(card, text=f"{len(launch['paths'])} app(s)", text_color="gray").pack(side="left")
+        ctk.CTkButton(card, text="▶️ Run", width=60,
+                      command=lambda l=launch: self.run_launch(l)).pack(side="right", padx=5)
+        ctk.CTkButton(card, text="✏️ Edit", width=60,
+                      command=lambda i=index: self.edit_launch(i)).pack(side="right", padx=5)
+        ctk.CTkButton(card, text="🗑️ Del", width=60, fg_color="red",
+                      command=lambda i=index: self.delete_launch(i)).pack(side="right", padx=5)
+
+    def add_launch(self):
+        LaunchEditor(self, on_save=self._on_added)
+
+    def _on_added(self, data):
+        self.launches.append(data)
+        save_launches(self.launches)
+        self.refresh_list()
+
+    def edit_launch(self, index):
+        LaunchEditor(self, on_save=lambda d: self._on_edited(index, d), existing=self.launches[index])
+
+    def _on_edited(self, index, data):
+        self.launches[index] = data
+        save_launches(self.launches)
+        self.refresh_list()
+
+    def delete_launch(self, index):
+        if messagebox.askyesno("Confirm", f"Delete '{self.launches[index]['name']}'?"):
+            self.launches.pop(index)
+            save_launches(self.launches)
+            self.refresh_list()
+
+    def log(self, text, end="\n"):
+        if end == "\r":
+            # overwrite the current countdown line only
+            # delete from start of last line to the end of the widget
+            self.log_box.delete("end-1l linestart", "end-1c")
+            self.log_box.insert("end", text)
+        else:
+            self.log_box.insert("end", text + end)
+        self.log_box.see("end")
+        self.update_idletasks()
+
+    def run_launch(self, launch):
+        """Run launch sequence in background, ensuring only one runs at once."""
+        if getattr(self, "_launching", False):
+            self.log("⚠️ A launch is already running.")
+            return
+
+        self._launching = True
+        self.log(f"▶️ Starting {launch['name']}...")
+
+        # run in background thread
+        t = threading.Thread(target=self._run_launch_in_thread, args=(launch,), daemon=True)
+        t.start()
+
+    def _run_launch_in_thread(self, launch):
+        async def run():
+            await run_launch_sequence(launch["paths"], self.log)
+        try:
+            asyncio.run(run())
+        except Exception as e:
+            self.log(f"💥 Error: {e}")
+        finally:
+            self._launching = False
+
+if __name__ == "__main__":
+    app = AppLauncher()
+    app.mainloop()
