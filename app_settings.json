@@ -1,0 +1,8 @@
+{
+  "app_name": "App Launcher",
+  "exe_name": "AppLauncher",
+  "window_title": "App Launcher",
+  "version": "1.0.0",
+  "icon_path": "resources/icons/AppLauncher.ico",
+  "include_resources": "resources/icons;resources/icons"
+}

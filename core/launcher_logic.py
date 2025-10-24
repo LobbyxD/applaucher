@@ -7,46 +7,6 @@ import os
 
 async def launch_app(path: str, delay: float, start_option: str):
     """Launch an app or batch file with correct visibility behavior."""
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= win32con.STARTF_USESHOWWINDOW
-
-    if start_option == "Maximized":
-        si.wShowWindow = win32con.SW_SHOWMAXIMIZED
-    elif start_option == "Minimized":
-        si.wShowWindow = win32con.SW_SHOWMINNOACTIVE
-    else:
-        si.wShowWindow = win32con.SW_SHOWNORMAL
-
-    creation_flags = 0
-    if start_option == "Minimized":
-        creation_flags = win32process.DETACHED_PROCESS
-
-    exe_name = os.path.basename(path).lower()
-    if exe_name.endswith(".exe"):
-        exe_name = exe_name  # e.g., Ryujinx.exe
-    elif exe_name.endswith(".bat"):
-        exe_name = exe_name[:-4] + ".exe"  # guess main exe name if same base
-
-    # ✅ Check if already running
-    for p in psutil.process_iter(attrs=["name"]):
-        try:
-            if p.info["name"] and p.info["name"].lower() == exe_name:
-                print(f"⚠️ {exe_name} is already running. Skipping.")
-                return
-        except psutil.NoSuchProcess:
-            continue
-
-    # ✅ Detect .bat files and use cmd /c to run them silently
-    if path.lower().endswith(".bat"):
-        subprocess.Popen(["cmd.exe", "/c", path], startupinfo=si, creationflags=creation_flags)
-    else:
-        subprocess.Popen([path], startupinfo=si, creationflags=creation_flags)
-
-    await asyncio.sleep(delay)
-
-
-async def launch_app(path: str, delay: float, start_option: str):
-    """Launch an app or batch file with correct visibility behavior."""
     # --- Normalize path to handle both quoted/unquoted inputs ---
     path = path.strip().strip('"').strip("'")
 

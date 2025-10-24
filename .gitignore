@@ -1,26 +1,91 @@
-# --- Python cache / build files ---
+# -------------------------------
+# Core Python ignore patterns
+# -------------------------------
 __pycache__/
 *.py[cod]
-*$py.class
-
-# --- PyInstaller build outputs ---
-/build/
-/dist/
-*.spec
-
-# --- Virtual environments ---
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.env/
 .venv/
 env/
 venv/
+build/
+dist/
+*.spec
 
-# --- Logs & temp files ---
-*.log
-*.tmp
+# -------------------------------
+# IDE and Editor files
+# -------------------------------
+.vscode/
+.idea/
+*.iml
 
-# --- OS-specific junk ---
+# -------------------------------
+# OS-generated files
+# -------------------------------
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# --- Local user data (do not commit per-user app settings) ---
-/AppData/
-/data.json
+# -------------------------------
+# PyInstaller build artifacts
+# -------------------------------
+# Everything PyInstaller generates
+/AppLauncher.spec
+/main.spec
+/build/
+/dist/
+/*.log
+/warn-*.txt
+/xref-*.html
+/localpycs/
+
+# -------------------------------
+# Local AppData saves (user data)
+# -------------------------------
+# Theme and launch settings stored under AppData or local testing folder
+launches.json
+settings.json
+
+# -------------------------------
+# Temporary and test files
+# -------------------------------
+*.tmp
+*.bak
+*.swp
+*.lock
+*.log
+
+# -------------------------------
+# Ignore virtual environment cache and compiled intermediates
+# -------------------------------
+*.pyproj
+*.sln
+*.db
+*.sqlite3
+*.pkl
+*.cache/
+.cache/
+pytest_cache/
+.tox/
+
+# -------------------------------
+# Git internals (in case nested)
+# -------------------------------
+.git/
+.gitignore
+
+# -------------------------------
+# Only keep essential build files
+# -------------------------------
+!main.py
+!build.py
+!make_icon.py
+!app_settings.json
+!README.md
+!core/**
+!ui/**
+!resources/**
