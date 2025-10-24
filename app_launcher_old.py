@@ -1,37 +1,36 @@
-# app_launcher.py — Grayscale UI with File menu + full-width separator
-from __future__ import annotations
-import sys, os, json, threading, asyncio
-from typing import List, Dict, Any, Optional
+# app_launcher.py — PyQt6 rewrite (single-file)
+# Requires: pip install PyQt6
+# Keeps your backend: launcher_logic.run_launch_sequence
 
-from PyQt6.QtCore import QCoreApplication, QStandardPaths, Qt, QSize
-from PyQt6.QtGui import QAction, QIcon, QColor, QPalette, QCursor
+from __future__ import annotations
+import sys, os, json, threading
+from typing import List, Dict, Any, Optional
+import asyncio
+from PyQt6.QtCore import QCoreApplication, QStandardPaths
+from PyQt6.QtCore import Qt, QSize, QPoint, QSettings
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QDialog,
-    QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
-    QDoubleSpinBox, QComboBox, QFileDialog, QMessageBox, QFrame, QCheckBox, QSizePolicy
+    QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
+    QDoubleSpinBox, QComboBox, QFileDialog, QMessageBox, QFrame, QCheckBox
 )
-
+import os, json
 from launcher_logic import run_launch_sequence
 
-def get_icon(name: str) -> QIcon:
-    """
-    Returns a QIcon for an SVG file in resources/icons.
-    Automatically handles PyInstaller _MEIPASS paths.
-    """
-    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    icon_path = os.path.join(base_dir, "resources", "icons", name)
-    return QIcon(icon_path)
 
 QCoreApplication.setOrganizationName("Lobbyx3")
 QCoreApplication.setApplicationName("App Launcher")
 
 APP_NAME = "App Launcher"
 DATA_FILE = "launches.json"
+
 MODES = ["Not Maximized", "Maximized", "Minimized"]
 
 # =========================
-# Theme manager (grayscale)
+# Theme manager (No flicker)
 # =========================
+
 class ThemeManager:
     SETTINGS_FILE = os.path.join(
         QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation),
@@ -51,6 +50,7 @@ class ThemeManager:
     @staticmethod
     def is_dark() -> bool:
         data = ThemeManager._load()
+        # Default to dark if not found
         return bool(data.get("dark", True))
 
     @staticmethod
@@ -61,48 +61,63 @@ class ThemeManager:
         with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
+    def main():
+        app = QApplication(sys.argv)
+        # 🔧 Set org/app name so QStandardPaths knows where to store data
+        QCoreApplication.setOrganizationName("Lobbyx3")
+        QCoreApplication.setApplicationName("App Launcher")
+
+        # apply saved theme
+        ThemeManager.apply(app, ThemeManager.is_dark())
+
+        w = MainWindow()
+        w.show()
+        sys.exit(app.exec())
+
     @staticmethod
-    def apply(app: QApplication, dark: bool):
+    def apply(app, dark: bool):
+        """Apply Qt palette + QSS styling for dark/light mode."""
         from PyQt6.QtWidgets import QStyleFactory
+        from PyQt6.QtGui import QPalette, QColor
+
         app.setStyle(QStyleFactory.create("Fusion"))
         p = QPalette()
 
-        # Strict grayscale palette
+        def set_color(role, hex_color):
+            p.setColor(getattr(QPalette.ColorRole, role), QColor(hex_color))
+
         if dark:
-            bg, base, alt, text, btn, btn_text, border, hover = (
-                "#1e1e1e", "#2a2a2a", "#222222", "#e6e6e6",
-                "#2a2a2a", "#e6e6e6", "#3a3a3a", "#333333"
-            )
+            # --- Dark palette ---
+            set_color("Window", "#111827")
+            set_color("WindowText", "#e5e7eb")
+            set_color("Base", "#0f172a")
+            set_color("AlternateBase", "#1e293b")
+            set_color("Text", "#e5e7eb")
+            set_color("Button", "#1e293b")
+            set_color("ButtonText", "#e5e7eb")
+            set_color("Highlight", "#3b82f6")
+            set_color("HighlightedText", "#111827")
         else:
-            bg, base, alt, text, btn, btn_text, border, hover = (
-                "#f5f5f5", "#ffffff", "#f0f0f0", "#222222",
-                "#ffffff", "#222222", "#d0d0d0", "#e6e6e6"
-            )
+            # --- Light palette ---
+            set_color("Window", "#f9fafb")
+            set_color("WindowText", "#111827")
+            set_color("Base", "#ffffff")
+            set_color("AlternateBase", "#ffffff")
+            set_color("Text", "#111827")
+            set_color("Button", "#ffffff")
+            set_color("ButtonText", "#111827")
+            set_color("Highlight", "#2563eb")
+            set_color("HighlightedText", "#ffffff")
 
-        p.setColor(QPalette.ColorRole.Window, QColor(bg))
-        p.setColor(QPalette.ColorRole.Base, QColor(base))
-        p.setColor(QPalette.ColorRole.WindowText, QColor(text))
-        p.setColor(QPalette.ColorRole.Button, QColor(btn))
-        p.setColor(QPalette.ColorRole.ButtonText, QColor(btn_text))
         app.setPalette(p)
-
-        app.setStyleSheet(f"""
-        QWidget {{ font-size:14px; font-family:'Segoe UI', sans-serif; color:{text}; }}
-        QFrame#card {{ border-radius:10px; border:1px solid {border}; background:{base}; }}
-        QListWidget {{
-            border:1px solid {border}; border-radius:8px; padding:6px; background:{base};
-        }}
-        QListWidget::item {{
-            margin:4px; border:1px solid {border}; border-radius:8px; background:{base};
-        }}
-        QListWidget::item:hover {{ background:{hover}; }}
-        QPushButton {{
-            border:1px solid {border}; border-radius:8px; padding:8px 12px; background:{btn}; color:{btn_text};
-        }}
-        QPushButton:hover {{ background:{hover}; }}
-        QLineEdit, QDoubleSpinBox, QComboBox {{
-            border:1px solid {border}; border-radius:6px; padding:6px; background:{base};
-        }}
+        app.setStyleSheet("""
+        QWidget { font-size: 14px; }
+        QFrame#card { border-radius: 12px; border: 1px solid palette(Midlight); }
+        QLineEdit, QDoubleSpinBox, QComboBox, QListWidget {
+            border-radius: 8px; padding: 6px; border: 1px solid palette(Midlight);
+        }
+        QPushButton { border-radius: 8px; padding: 8px 12px; }
+        QPushButton:hover { opacity: 0.9; }
         """)
 
 # =========================
@@ -112,6 +127,7 @@ class PathRow(QWidget):
     def __init__(self, path: str = "", delay: float = 0.0, mode: str = "Not Maximized"):
         super().__init__()
         self.path_edit = QLineEdit(path)
+        self.path_edit.setPlaceholderText("Path to .exe / .bat / .cmd / .lnk")
         self.browse_btn = QPushButton("📁")
         self.browse_btn.setFixedWidth(36)
         self.delay = QDoubleSpinBox()
@@ -125,8 +141,11 @@ class PathRow(QWidget):
             self.mode.setCurrentText(mode)
         self.delete_btn = QPushButton("🗑")
         self.delete_btn.setFixedWidth(36)
+
+        # visual handle label (drag is handled by QListWidget itself)
         self.handle = QLabel("☰")
         self.handle.setFixedWidth(20)
+        self.handle.setToolTip("Drag to reorder")
 
         row = QHBoxLayout(self)
         row.setContentsMargins(8, 6, 8, 6)
@@ -139,6 +158,7 @@ class PathRow(QWidget):
         row.addWidget(QLabel("Mode:"))
         row.addWidget(self.mode)
         row.addWidget(self.delete_btn)
+
         self.browse_btn.clicked.connect(self._pick)
 
     def _pick(self):
@@ -156,6 +176,7 @@ class PathRow(QWidget):
             "start_option": self.mode.currentText(),
         }
 
+
 # =========================
 # Add/Edit dialog
 # =========================
@@ -167,13 +188,19 @@ class LaunchEditor(QDialog):
         self.setModal(True)
         self.on_save = on_save
 
+        # header
         header = QLabel("🧩  Add / Edit Launch")
         header.setStyleSheet("font-size:22px; font-weight:600; margin-bottom: 6px;")
 
-        card = QFrame(); card.setObjectName("card")
+        # card container
+        card = QFrame()
+        card.setObjectName("card")
 
+        # name
         name_lbl = QLabel("App Launcher Name")
+        name_lbl.setStyleSheet("font-weight:600;")
         self.name_edit = QLineEdit(existing["name"] if existing else "")
+        self.name_edit.setPlaceholderText("e.g. My Game Bundle")
         helper = QLabel("Name displayed on the main launcher list.")
         helper.setStyleSheet("font-size:12px; opacity:0.75;")
 
@@ -182,24 +209,36 @@ class LaunchEditor(QDialog):
         name_box.addWidget(self.name_edit)
         name_box.addWidget(helper)
 
+        # paths section
         paths_lbl = QLabel("Paths to Launch")
+        paths_lbl.setStyleSheet("font-weight:600;")
+
         self.listw = QListWidget()
         self.listw.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.listw.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.listw.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.listw.setSpacing(6)
+
+        # load existing paths
         for p in (existing["paths"] if existing else []):
             self._add_row(p.get("path",""), p.get("delay",0.0), p.get("start_option","Not Maximized"))
 
         add_btn = QPushButton("➕  Add Path")
         add_btn.clicked.connect(lambda: self._add_row())
 
+        # card layout
         inner = QVBoxLayout(card)
         inner.setContentsMargins(16, 16, 16, 16)
         inner.setSpacing(10)
         inner.addLayout(name_box)
-        inner.addWidget(QFrame(frameShape=QFrame.Shape.HLine))
+        # subtle divider
+        div = QFrame(); div.setFrameShape(QFrame.Shape.HLine)
+        inner.addWidget(div)
         inner.addWidget(paths_lbl)
         inner.addWidget(self.listw, 1)
         inner.addWidget(add_btn)
 
+        # footer
         save_btn = QPushButton("💾  Save Launch")
         cancel_btn = QPushButton("Cancel")
         footer = QHBoxLayout()
@@ -207,12 +246,14 @@ class LaunchEditor(QDialog):
         footer.addWidget(cancel_btn)
         footer.addWidget(save_btn)
 
+        # root
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 18, 24, 18)
         root.setSpacing(12)
         root.addWidget(header)
         root.addWidget(card, 1)
         root.addLayout(footer)
+
         cancel_btn.clicked.connect(self.reject)
         save_btn.clicked.connect(self._save)
 
@@ -222,7 +263,11 @@ class LaunchEditor(QDialog):
         item.setSizeHint(QSize(0, 50))
         self.listw.addItem(item)
         self.listw.setItemWidget(item, w)
-        w.delete_btn.clicked.connect(lambda: self.listw.takeItem(self.listw.row(item)))
+        w.delete_btn.clicked.connect(lambda: self._remove_item(item))
+
+    def _remove_item(self, item: QListWidgetItem):
+        row = self.listw.row(item)
+        self.listw.takeItem(row)
 
     def _save(self):
         name = (self.name_edit.text() or "").strip() or "Untitled"
@@ -240,137 +285,173 @@ class LaunchEditor(QDialog):
             self.on_save({"name": name, "paths": paths})
         self.accept()
 
-# =========================
-# Row widget for main list
-# =========================
-class LaunchListRow(QWidget):
-    def __init__(self, name: str, on_run, on_edit, on_delete):
-        super().__init__()
-        row = QHBoxLayout(self)
-        row.setContentsMargins(10, 6, 10, 6)
-        row.setSpacing(8)
-        self.edit_btn = QPushButton()
-        self.edit_btn.setIcon(get_icon("edit.svg"))
-        self.edit_btn.setFixedWidth(50)
-        self.edit_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.name_btn = QPushButton(name)
-        self.name_btn.setFlat(True)
-        self.name_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.name_btn.setStyleSheet("text-align:left; font-weight:600; padding:6px; border:none;")
-        self.name_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.del_btn = QPushButton()
-        self.del_btn.setIcon(get_icon("delete.svg"))
-        self.del_btn.setFixedWidth(30)
-        self.del_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        row.addWidget(self.edit_btn)
-        row.addWidget(self.name_btn, 1)
-        row.addWidget(self.del_btn)
-        self.name_btn.clicked.connect(on_run)
-        self.edit_btn.clicked.connect(on_edit)
-        self.del_btn.clicked.connect(on_delete)
 
-    # =========================
-    # Main Window
-    # =========================
+# =========================
+# Settings (theme toggle)
+# =========================
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None, dark: bool = True, on_changed=None):
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.setModal(True)
+        self.setMinimumWidth(360)
+        self.on_changed = on_changed
 
+        card = QFrame(); card.setObjectName("card")
+        row = QHBoxLayout(card)
+        row.setContentsMargins(16, 16, 16, 16)
+        row.setSpacing(12)
+        label = QLabel("Dark Mode")
+        self.toggle = QCheckBox()
+        self.toggle.setChecked(dark)
+        row.addWidget(label)
+        row.addStretch(1)
+        row.addWidget(self.toggle)
+
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        close = QPushButton("Close")
+        btns.addWidget(close)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 18, 24, 18)
+        root.setSpacing(12)
+        header = QLabel("⚙️  Settings"); header.setStyleSheet("font-size:20px; font-weight:600;")
+        root.addWidget(header)
+        root.addWidget(card)
+        root.addLayout(btns)
+
+        close.clicked.connect(self.accept)
+        self.toggle.stateChanged.connect(self._apply)
+
+    def _apply(self):
+        if self.on_changed:
+            self.on_changed(bool(self.toggle.isChecked()))
+
+
+# =========================
+# Main Window
+# =========================
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.resize(900, 620)
+        self.resize(880, 600)
         self.launches: List[Dict[str, Any]] = []
         self._load_data()
 
-        central = QWidget(); self.setCentralWidget(central)
-        root = QVBoxLayout(central)
-        root.setContentsMargins(0, 0, 0, 16)
-        root.setSpacing(0)
+        central = QWidget()
+        self.setCentralWidget(central)
 
-        # ----- Menu renamed to File -----
-        app_menu = self.menuBar().addMenu("File")
+        # header
+        title = QLabel("🚀  App Launcher")
+        title.setStyleSheet("font-size:22px; font-weight:700; margin-bottom:4px;")
+        subtitle = QLabel("Create launch bundles with multiple paths, delays and window modes.")
+
+        # card (list)
+        card = QFrame(); card.setObjectName("card")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(10)
+
+        # list with internal drag
+        self.listw = QListWidget()
+        self.listw.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.listw.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.listw.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.listw.setSpacing(6)
+
+        # buttons
+        btn_row = QHBoxLayout()
+        self.add_btn = QPushButton("➕  Add")
+        self.edit_btn = QPushButton("✏️  Edit")
+        self.del_btn = QPushButton("🗑  Delete")
+        self.run_btn = QPushButton("▶  Run")
+        btn_row.addWidget(self.add_btn)
+        btn_row.addWidget(self.edit_btn)
+        btn_row.addWidget(self.del_btn)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.run_btn)
+
+        card_layout.addWidget(QLabel("Launchers"))
+        card_layout.addWidget(self.listw, 1)
+        card_layout.addLayout(btn_row)
+
+        root = QVBoxLayout(central)
+        root.setContentsMargins(24, 18, 24, 18)
+        root.setSpacing(12)
+        root.addWidget(title)
+        root.addWidget(subtitle)
+        root.addWidget(card, 1)
+
+        # menu
+        menu = self.menuBar().addMenu("App")
         act_settings = QAction("Settings…", self)
         act_quit = QAction("Quit", self)
-        app_menu.addAction(act_settings)
-        app_menu.addSeparator()
-        app_menu.addAction(act_quit)
+        menu.addAction(act_settings)
+        menu.addSeparator()
+        menu.addAction(act_quit)
+
+        # signals
+        self.add_btn.clicked.connect(self._add)
+        self.edit_btn.clicked.connect(self._edit)
+        self.del_btn.clicked.connect(self._delete)
+        self.run_btn.clicked.connect(self._run_selected)
+        self.listw.itemDoubleClicked.connect(lambda _: self._run_selected())
+        self.listw.model().rowsMoved.connect(self._rows_moved)  # update order on drag
         act_settings.triggered.connect(self._open_settings)
         act_quit.triggered.connect(self.close)
 
-        # ----- Create dark bar (like a full-width section divider) -----
-        self.top_bar = QFrame()
-        self.top_bar.setFixedHeight(36)
-        self.top_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._apply_topbar_color()  # theme-aware background
-        root.addWidget(self.top_bar)
-
-        # ----- Content area -----
-        content = QVBoxLayout()
-        content.setContentsMargins(16, 12, 16, 16)
-        content.setSpacing(12)
-        root.addLayout(content, 1)
-
-        # ----- Section title row -----
-        head = QHBoxLayout()
-        title = QLabel("Launcher List")
-        title.setStyleSheet("font-weight:600; font-size:16px;")
-        head.addWidget(title)
-        head.addStretch(1)
-        self.add_btn = QPushButton()
-        self.add_btn.setIcon(get_icon("add.svg"))
-        self.add_btn.clicked.connect(self._add)
-        head.addWidget(self.add_btn)
-        content.addLayout(head)
-
-        # ----- List container -----
-        self.listw = QListWidget()
-        self.listw.setSpacing(8)
-        self.listw.setUniformItemSizes(False)
-        content.addWidget(self.listw, 1)
-
         self._refresh_list()
-
-    # ----- Apply theme to top bar -----
-    def _apply_topbar_color(self):
-        dark = ThemeManager.is_dark()
-        color = "#1e1e1e"" if dark else "#e0e0e0"
-        self.top_bar.setStyleSheet(f"background-color: {color}; border: none;")
 
     # ---------- data ----------
     def _data_path(self) -> str:
+        # Get user's %APPDATA%/App Launcher
         base_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
         os.makedirs(base_dir, exist_ok=True)
         return os.path.join(base_dir, DATA_FILE)
 
+
     def _load_data(self):
-        try:
-            with open(self._data_path(), "r", encoding="utf-8") as f:
-                self.launches = json.load(f)
-        except Exception:
+        p = self._data_path()
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    self.launches = json.load(f)
+            except Exception:
+                self.launches = []
+        else:
             self.launches = []
 
     def _save_data(self):
+        p = self._data_path()
         try:
-            with open(self._data_path(), "w", encoding="utf-8") as f:
+            with open(p, "w", encoding="utf-8") as f:
                 json.dump(self.launches, f, indent=2)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save:\n{e}")
 
-    # ---------- UI ----------
+    # ---------- UI helpers ----------
     def _refresh_list(self):
         self.listw.clear()
-        for i, bundle in enumerate(self.launches):
+        for bundle in self.launches:
             name = bundle.get("name", "Untitled")
-            def make_cb(index=i):
-                def run(): self._run_index(index)
-                def edit(): self._edit_index(index)
-                def delete(): self._delete_index(index)
-                return run, edit, delete
-            on_run, on_edit, on_delete = make_cb(i)
-            item = QListWidgetItem()
-            row = LaunchListRow(name, on_run, on_edit, on_delete)
-            item.setSizeHint(QSize(0, 58))
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, bundle)
             self.listw.addItem(item)
-            self.listw.setItemWidget(item, row)
+
+    def _current_index(self) -> int:
+        row = self.listw.currentRow()
+        return row if row >= 0 else -1
+
+    def _rows_moved(self, *_):
+        # Update self.launches to match list order
+        new_order = []
+        for i in range(self.listw.count()):
+            bundle = self.listw.item(i).data(Qt.ItemDataRole.UserRole)
+            new_order.append(bundle)
+        self.launches = new_order
+        self._save_data()
 
     # ---------- actions ----------
     def _add(self):
@@ -382,85 +463,78 @@ class MainWindow(QMainWindow):
         dlg = LaunchEditor(existing=None, dark=dark, on_save=on_save)
         dlg.exec()
 
-    def _edit_index(self, i: int):
-        if i < 0 or i >= len(self.launches): return
+    def _edit(self):
+        i = self._current_index()
+        if i < 0:
+            return
         dark = ThemeManager.is_dark()
         def on_save(data):
             self.launches[i] = data
             self._save_data()
             self._refresh_list()
+            self.listw.setCurrentRow(i)
         existing = self.launches[i]
         dlg = LaunchEditor(existing=existing, dark=dark, on_save=on_save)
         dlg.exec()
 
-    def _delete_index(self, i: int):
-        if i < 0 or i >= len(self.launches): return
+    def _delete(self):
+        i = self._current_index()
+        if i < 0:
+            return
         name = self.launches[i].get("name", "Untitled")
         if QMessageBox.question(self, "Delete", f"Delete '{name}'?") == QMessageBox.StandardButton.Yes:
             self.launches.pop(i)
             self._save_data()
             self._refresh_list()
 
-    def _run_index(self, i: int):
-        if i < 0 or i >= len(self.launches): return
+    def _run_selected(self):
+        i = self._current_index()
+        if i < 0:
+            return
         bundle = self.launches[i]
+
         def worker():
             try:
                 asyncio.run(run_launch_sequence(bundle["paths"]))
+  # <- keep your existing backend
             except Exception as e:
+                # show error on UI thread
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", str(e)))
+
         threading.Thread(target=worker, daemon=True).start()
 
     def _open_settings(self):
         dark = ThemeManager.is_dark()
         def on_changed(v: bool):
             ThemeManager.set_dark(v)
-            ThemeManager.apply(QApplication.instance(), v)
-            self._apply_topbar_color()
+            ThemeManager.apply(QApplication.instance(), v)  # instant, no flicker
         dlg = SettingsDialog(self, dark=dark, on_changed=on_changed)
         dlg.exec()
 
-# =========================
-# Settings dialog (unchanged)
-# =========================
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None, dark: bool = True, on_changed=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.setModal(True)
-        self.on_changed = on_changed
-
-        card = QFrame(); card.setObjectName("card")
-        row = QHBoxLayout(card)
-        row.setContentsMargins(16, 16, 16, 16)
-        label = QLabel("Dark Mode")
-        self.toggle = QCheckBox(); self.toggle.setChecked(dark)
-        row.addWidget(label); row.addStretch(1); row.addWidget(self.toggle)
-
-        close = QPushButton("Close")
-        layout = QVBoxLayout(self)
-        layout.addWidget(card)
-        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
-        close.clicked.connect(self.accept)
-        self.toggle.stateChanged.connect(self._apply)
-
-    def _apply(self):
-        if self.on_changed:
-            self.on_changed(bool(self.toggle.isChecked()))
 
 # =========================
 # Entrypoint
 # =========================
 def main():
     app = QApplication(sys.argv)
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "AppLauncher.ico")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    QCoreApplication.setOrganizationName("Lobbyx3")
+    QCoreApplication.setApplicationName("App Launcher")
+
+    # ✅ Load icon from runtime directory (works after PyInstaller freeze)
+    base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    icon_path = os.path.join(base_dir, "AppLauncher.ico")
+    app_icon = QIcon(icon_path)
+    app.setWindowIcon(app_icon)
+
     ThemeManager.apply(app, ThemeManager.is_dark())
+
     w = MainWindow()
+    w.setWindowIcon(app_icon)
     w.show()
     sys.exit(app.exec())
+
+
 
 if __name__ == "__main__":
     main()
