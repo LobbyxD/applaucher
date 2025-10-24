@@ -154,19 +154,4 @@ Developed by **Daniel Shafir**
 
 ```
 
----
-
-### ✅ Why this is best practice
-
-| Section | Reason |
-|----------|--------|
-| Clear title + emoji | Looks professional and readable on GitHub |
-| Features section | Explains purpose before installation |
-| Two build options | `build.py` preferred, manual command as backup |
-| Requirements list | Reproducible setup for contributors |
-| Explicit `AppData` locations | Prevents confusion on save paths |
-| PowerShell + cross-platform commands | Works for both Windows & Linux |
-| Structured layout | Recognized instantly by developers reviewing repo |
-
----
 ```
