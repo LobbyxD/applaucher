@@ -1,5 +1,5 @@
 # ui/main_window.py
-import sys, os, threading, asyncio
+import sys, os, threading, asyncio, re
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QFrame, QMessageBox, QApplication, QSizePolicy, QMenu
@@ -13,12 +13,32 @@ from ui.dialogs.settings_dialog import SettingsDialog
 from core.app_settings import APP_SETTINGS
 from core.launcher_logic import run_launch_sequence
 from core.storage import load_launches, save_launches
+from PyQt6.QtCore import QStandardPaths
+from win32com.client import Dispatch
+
+def _sanitize_filename(name: str) -> str:
+    # Windows-invalid chars: <>:"/\|?*
+    return re.sub(r'[<>:"/\\|?*]', "_", name).strip()
+
+
 
 APP_NAME = APP_SETTINGS["window_title"]
 
 def get_icon(name: str) -> QIcon:
-    base_dir = getattr(sys, "_MEIPASS", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-    return QIcon(os.path.join(base_dir, "resources", "icons", name))
+    """Return a QIcon with correct path resolution for both dev and frozen builds."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running from PyInstaller bundle
+        base_dir = sys._MEIPASS
+    else:
+        # Running from source (VSCode, Python directly)
+        # Only go ONE level up from /ui/ to reach /resources/
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    icon_path = os.path.join(base_dir, "resources", "icons", name)
+    if not os.path.exists(icon_path):
+        print(f"⚠️ Missing icon: {icon_path}")
+    return QIcon(icon_path)
+
 
 class LaunchListRow(QWidget):
     def __init__(self, name, on_run, on_edit, on_delete):
@@ -27,6 +47,9 @@ class LaunchListRow(QWidget):
         self.edit_btn = QPushButton(); self.edit_btn.setIcon(get_icon("edit.svg"))
         self.name_btn = QPushButton(name)
         self.del_btn = QPushButton(); self.del_btn.setIcon(get_icon("delete.svg"))
+        self.export_btn = QPushButton()
+        self.export_btn.setIcon(get_icon("export.svg"))
+        self.export_btn.setToolTip("Create Desktop Shortcut")
         self.edit_btn.clicked.connect(on_edit)
         self.name_btn.clicked.connect(on_run)
         self.del_btn.clicked.connect(on_delete)
@@ -34,6 +57,7 @@ class LaunchListRow(QWidget):
             w.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         row.addWidget(self.edit_btn)
         row.addWidget(self.name_btn, 1)
+        row.addWidget(self.export_btn)
         row.addWidget(self.del_btn)
 
 class MainWindow(QMainWindow):
@@ -100,17 +124,30 @@ class MainWindow(QMainWindow):
         self.top_bar.setStyleSheet(f"background-color: {color}; border:none;")
 
     def _refresh_list(self):
+        """Rebuild the launcher list with Edit/Delete/Export controls."""
         self.listw.clear()
+
         for i, bundle in enumerate(self.launches):
             name = bundle.get("name", "Untitled")
+
+            # --- Define callbacks for each action ---
             def make_cb(index=i):
                 def run(): self._run_index(index)
                 def edit(): self._edit_index(index)
                 def delete(): self._delete_index(index)
-                return run, edit, delete
-            on_run, on_edit, on_delete = make_cb(i)
+                def export(): self._export_index(index)
+                return run, edit, delete, export
+
+            on_run, on_edit, on_delete, on_export = make_cb(i)
+
+            # --- Build row widget ---
             item = QListWidgetItem()
             row = LaunchListRow(name, on_run, on_edit, on_delete)
+
+            # If row has an export button, wire it up
+            if hasattr(row, "export_btn"):
+                row.export_btn.clicked.connect(on_export)
+
             item.setSizeHint(QSize(0, 58))
             self.listw.addItem(item)
             self.listw.setItemWidget(item, row)
@@ -137,6 +174,49 @@ class MainWindow(QMainWindow):
             self.launches.pop(i)
             save_launches(self.launches)
             self._refresh_list()
+
+    def _export_index(self, i):
+        """Create a Windows .lnk desktop shortcut for this App Launch (CurseForge style)."""
+        bundle = self.launches[i]
+        name = bundle.get("name", "Untitled")
+        safe = _sanitize_filename(name)
+
+        # Get real desktop path (OneDrive-safe)
+        desktop = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        if not desktop or not os.path.exists(desktop):
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+        shortcut_path = os.path.join(desktop, f"{safe}.lnk")
+
+        # Determine target + args
+        if getattr(sys, "frozen", False):
+            # Running from frozen build (AppLauncher.exe)
+            target = sys.executable
+            arguments = f'--launch "{name}"'
+            working_dir = os.path.dirname(sys.executable)
+            icon_path = os.path.join(os.path.dirname(sys.executable), "resources", "icons", "AppLauncher.ico")
+            if not os.path.exists(icon_path):
+                if hasattr(sys, "_MEIPASS"):
+                    icon_path = os.path.join(sys._MEIPASS, "resources", "icons", "AppLauncher.ico")
+        else:
+            # Running from source
+            target = sys.executable
+            main_py = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "main.py"))
+            arguments = f'"{main_py}" --launch "{name}"'
+            working_dir = os.path.dirname(main_py)
+            icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "icons", "AppLauncher.ico"))
+
+        # Create .lnk
+        shell = Dispatch("WScript.Shell")
+        shortcut = shell.CreateShortcut(shortcut_path)
+        shortcut.TargetPath = target
+        shortcut.Arguments = arguments
+        shortcut.WorkingDirectory = working_dir
+        if os.path.exists(icon_path):
+            shortcut.IconLocation = icon_path
+        shortcut.save()
+
+        QMessageBox.information(self, "Success", f"Desktop shortcut created:\n{shortcut_path}")
 
     def _run_index(self, i):
         bundle = self.launches[i]
