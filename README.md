@@ -149,7 +149,7 @@ See [`LICENSE`](LICENSE) for details.
 
 ## 👨‍💻 Author
 
-Developed by **Ron Edri**
+Developed by **Daniel Shafir**
 🪄 Built with ❤️ using Python + PyQt6
 
 ```
