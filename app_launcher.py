@@ -7,9 +7,8 @@ import sys, os, json, threading
 from typing import List, Dict, Any, Optional
 import asyncio
 from PyQt6.QtCore import QCoreApplication, QStandardPaths
-import os, sys, json, threading, asyncio
 from PyQt6.QtCore import Qt, QSize, QPoint, QSettings
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QDialog,
     QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -17,9 +16,8 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QComboBox, QFileDialog, QMessageBox, QFrame, QCheckBox
 )
 import os, json
-
-# ---- keep your existing launcher logic
 from launcher_logic import run_launch_sequence
+
 
 QCoreApplication.setOrganizationName("Lobbyx3")
 QCoreApplication.setApplicationName("App Launcher")
@@ -523,11 +521,20 @@ def main():
     QCoreApplication.setOrganizationName("Lobbyx3")
     QCoreApplication.setApplicationName("App Launcher")
 
-    # apply saved theme
+    # ✅ Load icon from runtime directory (works after PyInstaller freeze)
+    base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    icon_path = os.path.join(base_dir, "AppLauncher.ico")
+    app_icon = QIcon(icon_path)
+    app.setWindowIcon(app_icon)
+
     ThemeManager.apply(app, ThemeManager.is_dark())
+
     w = MainWindow()
+    w.setWindowIcon(app_icon)
     w.show()
     sys.exit(app.exec())
+
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/">
+    <file>AppLauncher.ico</file>
+  </qresource>
+</RCC>
