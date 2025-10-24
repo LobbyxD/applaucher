@@ -151,7 +151,3 @@ See [`LICENSE`](LICENSE) for details.
 
 Developed by **Daniel Shafir**
 🪄 Built with ❤️ using Python + PyQt6
-
-```
-
-```
