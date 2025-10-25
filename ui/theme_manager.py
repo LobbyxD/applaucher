@@ -1,14 +1,27 @@
 # ui/theme_manager.py
 import os, json
-from PyQt6.QtCore import QStandardPaths
+from PyQt6.QtCore import QStandardPaths, QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QStyleFactory
 
-class ThemeManager:
+
+class ThemeManager(QObject):
+    theme_changed = pyqtSignal(bool)  # emits True if dark, False if light
+    _instance = None
+
     SETTINGS_FILE = os.path.join(
         QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation),
         "settings.json"
     )
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    @staticmethod
+    def instance():
+        return ThemeManager._instance or ThemeManager()
 
     @staticmethod
     def _load() -> dict:
@@ -32,6 +45,7 @@ class ThemeManager:
         data["dark"] = bool(value)
         with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        ThemeManager.instance().theme_changed.emit(bool(value))  # 🔔 notify listeners
 
     @staticmethod
     def apply(app: QApplication, dark: bool):

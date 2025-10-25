@@ -8,8 +8,6 @@ from core.launcher_logic import run_launch_sequence
 from ui.main_window import MainWindow
 from ui.theme_manager import ThemeManager
 
-print("🧩 sys.argv =", sys.argv, flush=True)
-
 
 def run_direct_if_requested() -> bool:
     """If started with: --launch "<name>", run that launch and exit. Returns True if handled."""
