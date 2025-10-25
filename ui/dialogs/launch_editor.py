@@ -247,14 +247,22 @@ class LaunchEditor(QDialog):
         # Add footer inside the card, below list_container
         inner.addLayout(footer)
 
-        # --- Inline message ---
-        self.msg_label = QLabel("")
-        self.msg_label.setStyleSheet("font-size:12px; color:#f39c12;")
-
         # --- Root layout ---
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 18, 0, 10)
         root.setSpacing(5)
+
+        # --- Inline message (right aligned with clean padding) ---
+        msg_container = QHBoxLayout()
+        msg_container.setContentsMargins(0, 0, 18, 0)  # ⬅ right padding from window edge
+        msg_container.setSpacing(0)
+
+        self.msg_label = QLabel("")
+        self.msg_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.msg_label.setStyleSheet("font-size:12px; color:#e74c3c;")
+        msg_container.addWidget(self.msg_label, alignment=Qt.AlignmentFlag.AlignRight)
+
+        root.addLayout(msg_container)
 
         center_layout = QHBoxLayout()
         center_layout.setContentsMargins(14, 0, 14, 0)
@@ -412,7 +420,7 @@ class LaunchEditor(QDialog):
         """
         Show a persistent inline message (doesn't auto-clear unless duration is given).
         """
-        self.msg_label.setStyleSheet(f"font-size:12px; color:{color};")
+        self.msg_label.setStyleSheet(f"font-size:12px; color:{color}; padding-right: 15px;")
         self.msg_label.setText(text)
 
         # Only clear if a duration was explicitly provided
