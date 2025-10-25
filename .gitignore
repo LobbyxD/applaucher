@@ -42,6 +42,7 @@ desktop.ini
 /warn-*.txt
 /xref-*.html
 /localpycs/
+/__pycache__
 
 # -------------------------------
 # Local AppData saves (user data)
