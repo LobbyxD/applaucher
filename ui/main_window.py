@@ -9,7 +9,7 @@ from typing import cast
 import pythoncom
 from PyQt6.QtCore import QSize, QStandardPaths, Qt, QTimer
 from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
-from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel,
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QFrame,
                              QListWidget, QListWidgetItem, QMainWindow, QMenu,
                              QPushButton, QSystemTrayIcon, QVBoxLayout, QWidget)
 from win32com.client import Dispatch
@@ -149,11 +149,24 @@ class MainWindow(QMainWindow):
 
         ThemeManager.instance().theme_changed.connect(self.refresh_theme)
 
-        # --- launcher list ---
+        # --- launcher list container (theme-aware border) ---
+        list_container = QFrame()
+        list_container.setObjectName("launcherListContainer")
+        list_layout = QVBoxLayout(list_container)
+        list_layout.setContentsMargins(6, 6, 6, 6)
+        list_layout.setSpacing(0)
+
         self.listw = QListWidget()
         self.listw.setSpacing(8)
         self.listw.setUniformItemSizes(False)
-        content.addWidget(self.listw, 1)
+        self.listw.setFrameShape(QFrame.Shape.NoFrame)
+        self.listw.setFrameShadow(QFrame.Shadow.Plain)
+
+        list_layout.addWidget(self.listw)
+        content.addWidget(list_container, 1)
+
+        self._apply_list_container_style(list_container)
+        ThemeManager.instance().theme_changed.connect(lambda _: self._apply_list_container_style(list_container))
 
         # --- status message label (bottom of list) ---
         self.status_label = QLabel("")
@@ -216,6 +229,25 @@ class MainWindow(QMainWindow):
             }}
             QMenu::item:selected {{
                 background-color: {hover};
+            }}
+        """)
+
+    def _apply_list_container_style(self, container: QFrame):
+        """Apply theme-based border + background for launcher list area."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        border = colors["Border"]
+        base = colors["Base"]
+        hover = colors["Hover"]
+
+        container.setStyleSheet(f"""
+            QFrame#launcherListContainer {{
+                border: 1px solid {border};
+                border-radius: 8px;
+                background-color: {base};
+                margin-top: 4px;
+            }}
+            QFrame#launcherListContainer:hover {{
+                border: 1px solid {hover};
             }}
         """)
 

@@ -1,13 +1,12 @@
 import os
 from typing import Any, Dict, Optional, cast
 
-from PyQt6.QtCore import (QEasingCurve, QPoint, QPropertyAnimation, QSize, Qt,
-                          QTimer)
-from PyQt6.QtGui import QColor, QDrag, QPixmap
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (QDialog, QFrame, QGraphicsColorizeEffect,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                             QListWidgetItem, QPushButton, QToolButton,
-                             QVBoxLayout)
+                             QListWidgetItem, QPushButton, QSizePolicy,
+                             QToolButton, QVBoxLayout)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
@@ -83,6 +82,7 @@ class LaunchEditor(QDialog):
 
         # --- Name field ---
         name_lbl = QLabel("Launcher Name")
+        name_lbl.setStyleSheet("font-weight: 700;")
         name_container = QFrame()
         name_container.setStyleSheet("border: none;")
         name_layout = QHBoxLayout(name_container)
@@ -125,6 +125,7 @@ class LaunchEditor(QDialog):
         paths_row.setSpacing(8)
 
         paths_lbl = QLabel("Paths to Launch")
+        paths_lbl.setStyleSheet("font-weight: 700;")
 
         add_btn = QPushButton()
         add_btn.setIcon(themed_icon("add.svg"))
@@ -132,7 +133,6 @@ class LaunchEditor(QDialog):
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setFixedSize(36, 36)
         self._apply_button_style(add_btn)
-        add_btn.clicked.connect(lambda: self._add_row())
 
         paths_row.addWidget(paths_lbl)
         paths_row.addStretch(1)       # push button to the right
@@ -146,7 +146,27 @@ class LaunchEditor(QDialog):
         self.listw.setDropIndicatorShown(False)
         # Remove default sunken border and background
         self.listw.setFrameShape(QFrame.Shape.NoFrame)
-        self.listw.setStyleSheet(self.listw.styleSheet() + "QListWidget { background: transparent; }")
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        border = colors["Border"]
+
+        self.listw.setStyleSheet(f"""
+            QListWidget {{
+                background-color: transparent;
+                border: none;
+            }}
+            QListWidget::item {{
+                background-color: transparent;
+                border: none;
+                margin: 2px;
+            }}
+        """)
+
+
+        self.listw.setCursor(Qt.CursorShape.ArrowCursor)
+        self.listw.viewport().setCursor(Qt.CursorShape.ArrowCursor)
+
+        add_btn.clicked.connect(lambda: self._add_row())
 
 
         # Theme-based selection colors
@@ -175,8 +195,8 @@ class LaunchEditor(QDialog):
 
         # --- Inner layout ---
         inner = QVBoxLayout(card)
-        inner.setContentsMargins(16, 16, 16, 16)
-        inner.setSpacing(10)
+        inner.setContentsMargins(16, 16, 16, 0)
+        inner.setSpacing(5)
         inner.addLayout(name_box)
 
         divider = QFrame()
@@ -198,15 +218,34 @@ class LaunchEditor(QDialog):
         # Apply initial container style
         self._apply_list_container_style(list_container)
 
-        # --- Footer ---
-        save_btn = QPushButton("Save Launch")
+        # --- Footer (inside card) ---
+        save_btn = QPushButton("Save")
         cancel_btn = QPushButton("Cancel")
         self._apply_button_style(save_btn)
         self._apply_button_style(cancel_btn)
+        padding = "5 10 5 10"
+        margin = "0 0 5 0"
+        save_btn.setStyleSheet(f"padding: {padding}px; margin: {margin}px;")
+        cancel_btn.setStyleSheet(f"padding: {padding}px; margin: {margin}px;")
+
+        
+        # --- Footer (centered inside card) ---
         footer = QHBoxLayout()
+        footer.setContentsMargins(0, 4, 0, 0)  # small top margin only
+        footer.setSpacing(8)  # tighten space between buttons
+
+        # Center both buttons as a group
+        group = QHBoxLayout()
+        group.setSpacing(8)
+        group.addWidget(cancel_btn)
+        group.addWidget(save_btn)
+
         footer.addStretch(1)
-        footer.addWidget(cancel_btn)
-        footer.addWidget(save_btn)
+        footer.addLayout(group)
+        footer.addStretch(1)
+
+        # Add footer inside the card, below list_container
+        inner.addLayout(footer)
 
         # --- Inline message ---
         self.msg_label = QLabel("")
@@ -214,11 +253,20 @@ class LaunchEditor(QDialog):
 
         # --- Root layout ---
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 18, 24, 10)
-        root.setSpacing(0)
-        root.addWidget(card, 1)
+        root.setContentsMargins(0, 18, 0, 10)
+        root.setSpacing(5)
+
+        center_layout = QHBoxLayout()
+        center_layout.setContentsMargins(14, 0, 14, 0)
+        center_layout.setSpacing(0)
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        center_layout.addWidget(card, 1)
+        root.addLayout(center_layout, 1)
+
+        # Message label below card (optional, can also move inside if you prefer)
         root.addWidget(self.msg_label)
-        root.addLayout(footer)
+
+
 
         cancel_btn.clicked.connect(self.reject)
         save_btn.clicked.connect(self._save)
@@ -264,6 +312,8 @@ class LaunchEditor(QDialog):
             }}
         """)
 
+        # ✅ Set cursor explicitly (Qt API, not QSS)
+        container.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _refresh_button_styles(self):
         for btn in self.findChildren(QPushButton):

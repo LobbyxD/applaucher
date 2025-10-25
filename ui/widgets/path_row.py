@@ -1,10 +1,11 @@
 # ui/widgets/path_row.py
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QDoubleSpinBox, QComboBox, QFileDialog
-)
-from PyQt6.QtCore import Qt
-from typing import Dict, Any
+from typing import Any, Dict
+
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
+                             QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QWidget, QSizePolicy)
+
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
 
@@ -15,8 +16,13 @@ MODES = ["Not Maximized", "Maximized", "Minimized"]
 class PathRow(QWidget):
     def __init__(self, path: str = "", delay: float = None, mode: str = None):
         super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        # Give each row a subtle background for visibility
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        alt = colors["Window"]  # usually slightly lighter/darker
+        self.setStyleSheet(f"background-color: {alt}; border-radius: 8px;")
 
-        from ui.theme_manager import ThemeManager
         if delay is None:
             delay = float(ThemeManager.get_setting("default_delay", 0))
         if mode is None:
@@ -62,20 +68,29 @@ class PathRow(QWidget):
         row.setSpacing(6)
 
         # --- Drag handle icon ---
-        self.drag_lbl = QLabel()  # ✅ define after layout created
+        self.drag_lbl = QLabel()
         self.drag_lbl.setToolTip("Drag to reorder")
         self.drag_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.drag_lbl.setCursor(Qt.CursorShape.OpenHandCursor)  # ← grab cursor on hover
+        self.drag_lbl.setStyleSheet("background: transparent;")  # keep clean bg
+        self.drag_lbl.installEventFilter(self)                   # ← handle press/release
+
         drag_icon = themed_icon("bars.svg")
         self.drag_lbl.setPixmap(drag_icon.pixmap(16, 16))
         row.addWidget(self.drag_lbl)
 
+        delay_label = QLabel("Delay:")
+        delay_label.setStyleSheet("background: transparent;")
+        mode_label = QLabel("Mode:")
+        mode_label.setStyleSheet("background: transparent;")
         row.addWidget(self.path_edit, 1)
         row.addWidget(self.browse_btn)
-        row.addWidget(QLabel("Delay:"))
+        row.addWidget(delay_label)
         row.addWidget(self.delay)
-        row.addWidget(QLabel("Mode:"))
+        row.addWidget(mode_label)
         row.addWidget(self.mode)
         row.addWidget(self.delete_btn)
+        self.setLayout(row)
 
         # --- Behavior ---
         self.browse_btn.clicked.connect(self._pick)
