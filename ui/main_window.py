@@ -107,6 +107,24 @@ class MainWindow(QMainWindow):
         app_menu.addSeparator()
         app_menu.addAction(act_quit)
 
+        # --- Import / Export Launchers (theme-aware) ---
+        self.act_import = QAction("Import Launchers…", self)
+        self.act_export = QAction("Export Launchers…", self)
+
+        self.act_import.setIcon(themed_icon("import.svg"))
+        self.act_export.setIcon(themed_icon("export.svg"))
+
+        app_menu.addAction(self.act_import)
+        app_menu.addAction(self.act_export)
+        app_menu.addSeparator()
+        app_menu.addAction(act_settings)
+        app_menu.addSeparator()
+        app_menu.addAction(act_quit)
+
+        self.act_import.triggered.connect(self._import_launchers)
+        self.act_export.triggered.connect(self._export_launchers)
+
+
         act_settings.triggered.connect(self._open_settings)
         act_quit.triggered.connect(self.close)
 
@@ -151,9 +169,19 @@ class MainWindow(QMainWindow):
 
 
     def refresh_theme(self, is_dark: bool):
-        self._apply_menu_style()
         """Reapply icons and colors when theme toggles."""
+        self._apply_menu_style()
+
+        # Header buttons
         self.add_btn.setIcon(themed_icon("add.svg"))
+
+        # Menu actions (Import / Export)
+        if hasattr(self, "act_import"):
+            self.act_import.setIcon(themed_icon("import.svg"))
+        if hasattr(self, "act_export"):
+            self.act_export.setIcon(themed_icon("export.svg"))
+
+        # List rows
         for i in range(self.listw.count()):
             item = self.listw.item(i)
             row = self.listw.itemWidget(item)
@@ -391,6 +419,104 @@ class MainWindow(QMainWindow):
 
         # Re-add it to taskbar (Windows only)
         self.setWindowState(Qt.WindowState.WindowActive)
+
+        # === Import/Export Launchers ===
+    def _export_launchers(self):
+        """Export current launches.json to chosen location."""
+        from PyQt6.QtWidgets import QFileDialog
+        import json
+
+        downloads = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
+        if not downloads or not os.path.exists(downloads):
+            downloads = os.path.expanduser("~/Downloads")
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Launchers",
+            os.path.join(downloads, "launches_export.json"),
+            "JSON Files (*.json)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(self.launches, f, indent=2)
+            self._show_message(f"✅ Launchers exported to: {os.path.basename(file_path)}")
+        except Exception as e:
+            self._show_message(f"❌ Export failed: {e}")
+
+    def _import_launchers(self):
+        """Import launchers from chosen .json file."""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        import json
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Launchers",
+            "",
+            "JSON Files (*.json)"
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                imported = json.load(f)
+        except Exception as e:
+            QMessageBox.critical(self, "Invalid File", f"Failed to read file:\n{e}")
+            return
+
+        # --- Validate schema ---
+        if not isinstance(imported, list):
+            QMessageBox.critical(self, "Invalid Format", "JSON root must be a list of launchers.")
+            return
+
+        def _is_valid_launcher(item: dict) -> bool:
+            return (
+                isinstance(item, dict)
+                and "name" in item
+                and isinstance(item["name"], str)
+                and "paths" in item
+                and isinstance(item["paths"], list)
+                and all(
+                    isinstance(p, dict)
+                    and "path" in p
+                    and "delay" in p
+                    and "start_option" in p
+                    for p in item["paths"]
+                )
+            )
+
+        if not all(_is_valid_launcher(x) for x in imported):
+            QMessageBox.critical(self, "Invalid Structure", "One or more launchers are malformed.")
+            return
+
+        # --- Ask user to Merge or Replace ---
+        choice = QMessageBox.question(
+            self,
+            "Import Launchers",
+            "Do you want to merge with existing launchers, or replace them?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes
+        )
+        # Yes = Merge, No = Replace, Cancel = Abort
+        if choice == QMessageBox.StandardButton.Cancel:
+            return
+        elif choice == QMessageBox.StandardButton.Yes:
+            # Merge (avoid duplicates by name)
+            existing_names = {x.get("name") for x in self.launches}
+            merged = self.launches + [x for x in imported if x.get("name") not in existing_names]
+            self.launches = merged
+        else:
+            # Replace
+            self.launches = imported
+
+        # Save and refresh UI
+        save_launches(self.launches)
+        self._refresh_list()
+        self._show_message("✅ Launchers imported successfully.")
 
 
     def closeEvent(self, event: QCloseEvent):
