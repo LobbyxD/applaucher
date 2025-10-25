@@ -100,7 +100,9 @@ class LaunchEditor(QDialog):
         apply_tooltip_theme()
 
         # Connect live updates
-        ThemeManager.instance().theme_changed.connect(lambda _: (apply_input_theme(), apply_tooltip_theme()))
+        ThemeManager.instance().theme_changed.connect(
+            lambda _: (apply_input_theme(), apply_tooltip_theme(), self._refresh_button_styles(), self._refresh_list_container())
+        )
 
         # --- Info icon ---
         self._name_trailing_action = self.name_edit.addAction(
@@ -129,7 +131,7 @@ class LaunchEditor(QDialog):
         add_btn.setToolTip("Add new path")
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setFixedSize(36, 36)
-        add_btn.setStyleSheet("border:none; border-radius:6px; padding:4px;")
+        self._apply_button_style(add_btn)
         add_btn.clicked.connect(lambda: self._add_row())
 
         paths_row.addWidget(paths_lbl)
@@ -142,6 +144,10 @@ class LaunchEditor(QDialog):
         self.listw.setDragEnabled(False)
         self.listw.setAcceptDrops(False)
         self.listw.setDropIndicatorShown(False)
+        # Remove default sunken border and background
+        self.listw.setFrameShape(QFrame.Shape.NoFrame)
+        self.listw.setStyleSheet(self.listw.styleSheet() + "QListWidget { background: transparent; }")
+
 
         # Theme-based selection colors
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
@@ -180,12 +186,23 @@ class LaunchEditor(QDialog):
 
         # Add the row (label + button) above the list
         inner.addLayout(paths_row)
-        inner.addWidget(self.listw, 1)
 
+        # --- Themed container for the path list ---
+        list_container = QFrame()
+        list_container.setObjectName("pathListContainer")
+        list_layout = QVBoxLayout(list_container)
+        list_layout.setContentsMargins(6, 6, 6, 6)
+        list_layout.addWidget(self.listw)
+        inner.addWidget(list_container, 1)
+
+        # Apply initial container style
+        self._apply_list_container_style(list_container)
 
         # --- Footer ---
-        save_btn = QPushButton("💾  Save Launch")
+        save_btn = QPushButton("Save Launch")
         cancel_btn = QPushButton("Cancel")
+        self._apply_button_style(save_btn)
+        self._apply_button_style(cancel_btn)
         footer = QHBoxLayout()
         footer.addStretch(1)
         footer.addWidget(cancel_btn)
@@ -197,14 +214,67 @@ class LaunchEditor(QDialog):
 
         # --- Root layout ---
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 18, 24, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(0, 18, 24, 10)
+        root.setSpacing(0)
         root.addWidget(card, 1)
         root.addWidget(self.msg_label)
         root.addLayout(footer)
 
         cancel_btn.clicked.connect(self.reject)
         save_btn.clicked.connect(self._save)
+
+        # === Shared Styling Helper (theme-aware) ===
+    def _apply_button_style(self, btn: QPushButton):
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        border = colors["Border"]
+        hover = colors["Hover"]
+        base = colors["Button"]
+        text = colors["ButtonText"]
+
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                border: 1px solid {border};
+                border-radius: 6px;
+                background-color: {base};
+                color: {text};
+                padding: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover};
+            }}
+        """)
+
+        # === Themed Path List Container ===
+    def _apply_list_container_style(self, container: QFrame):
+        """Apply theme-based border and background for the path list area."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        border = colors["Border"]
+        base = colors["Base"]
+        hover = colors["Hover"]
+
+        container.setStyleSheet(f"""
+            QFrame#pathListContainer {{
+                border: 1px solid {border};
+                border-radius: 8px;
+                background-color: {base};
+                margin-top: 4px;
+            }}
+            QFrame#pathListContainer:hover {{
+                border: 1px solid {hover};
+            }}
+        """)
+
+
+    def _refresh_button_styles(self):
+        for btn in self.findChildren(QPushButton):
+            self._apply_button_style(btn)
+
+    def _refresh_list_container(self):
+        """Reapply list container theme when toggled."""
+        container = self.findChild(QFrame, "pathListContainer")
+        if container:
+            self._apply_list_container_style(container)
+
 
     def _flash_name_border(self, duration: int = 3000):
         """Flash the name input field red (uses same logic as other widgets)."""
@@ -283,7 +353,7 @@ class LaunchEditor(QDialog):
         w.delete_btn.setIcon(themed_icon("delete.svg"))
         w.delete_btn.setToolTip("Delete this path")
         w.delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        w.delete_btn.setStyleSheet("border:none; border-radius:6px; padding:4px;")
+        self._apply_button_style(w.delete_btn)
         w.delete_btn.setFixedSize(32, 32)
         w.delete_btn.clicked.connect(lambda: self.listw.takeItem(self.listw.row(item)))
 

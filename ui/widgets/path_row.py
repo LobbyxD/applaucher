@@ -33,7 +33,7 @@ class PathRow(QWidget):
         self.browse_btn.setToolTip("Browse for executable")
         self.browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.browse_btn.setFixedSize(32, 32)
-        self.browse_btn.setStyleSheet("border: none; border-radius: 6px; padding: 4px;")
+        self._apply_button_style(self.browse_btn)
 
         # Delay spinbox
         self.delay = QDoubleSpinBox()
@@ -54,7 +54,7 @@ class PathRow(QWidget):
         self.delete_btn.setToolTip("Delete this path")
         self.delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.delete_btn.setFixedSize(32, 32)
-        self.delete_btn.setStyleSheet("border: none; border-radius: 6px; padding: 4px;")
+        self._apply_button_style(self.delete_btn)
 
         # --- Layout ---
         row = QHBoxLayout(self)
@@ -82,12 +82,41 @@ class PathRow(QWidget):
 
         if hasattr(ThemeManager, "instance"):
             ThemeManager.instance().theme_changed.connect(self.refresh_icons)
+            ThemeManager.instance().theme_changed.connect(lambda _: self._refresh_button_styles())
+
+    def _refresh_button_styles(self):
+        """Reapply button colors when theme toggles."""
+        for btn in (self.browse_btn, self.delete_btn):
+            self._apply_button_style(btn)
 
     def refresh_icons(self, is_dark: bool):
         self.browse_btn.setIcon(themed_icon("folder.svg"))
         self.delete_btn.setIcon(themed_icon("delete.svg"))
         if getattr(self, "drag_lbl", None):
             self.drag_lbl.setPixmap(themed_icon("bars.svg").pixmap(16, 16))
+
+        # === Shared Styling Helper (theme-aware) ===
+    def _apply_button_style(self, btn: QPushButton):
+        """Apply a consistent border, radius, and hover color to PathRow buttons."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        border = colors["Border"]
+        hover = colors["Hover"]
+        base = colors["Button"]
+        text = colors["ButtonText"]
+
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                border: 1px solid {border};
+                border-radius: 6px;
+                background-color: {base};
+                color: {text};
+                padding: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover};
+            }}
+        """)
+
 
     def _pick(self):
         f, _ = QFileDialog.getOpenFileName(

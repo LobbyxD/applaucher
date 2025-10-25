@@ -135,6 +135,15 @@ class SettingsDialog(QDialog):
         # === Footer ===
         footer = QHBoxLayout()
         footer.addStretch()
+
+        # --- Open Settings Folder Button ---
+        open_folder_btn = QPushButton("Open Settings Folder")
+        open_folder_btn.setFixedWidth(180)
+        open_folder_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        open_folder_btn.clicked.connect(self._open_settings_folder)
+        footer.addWidget(open_folder_btn)
+
+        # --- Close Button ---
         close_btn = QPushButton("Close")
         close_btn.setFixedWidth(100)
         close_btn.clicked.connect(self.accept)
@@ -268,7 +277,23 @@ class SettingsDialog(QDialog):
 
         return card
 
+    # === Open Settings Folder ===
+    def _open_settings_folder(self):
+        """Opens the directory containing settings.json, themes.json, and log.txt."""
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        from ui.theme_manager import ThemeManager
 
+        ThemeManager.ensure_appdir()
+        folder = ThemeManager.APP_DIR
+        if os.path.exists(folder):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+        else:
+            QMessageBox.warning(
+                self,
+                "Folder Missing",
+                "Settings folder could not be found."
+            )
 
     # === Toggle Theme Logic ===
     def toggle_theme(self):
