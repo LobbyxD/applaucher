@@ -16,11 +16,6 @@ from ui.widgets.path_row import PathRow
 
 MODES = ["Not Maximized", "Maximized", "Minimized"]
 
-if ThemeManager.is_dark():
-    border, base, text = "#3a3a3a", "#2a2a2a", "#e6e6e6"
-else:
-    border, base, text = "#d0d0d0", "#ffffff", "#222222"
-
 class LaunchEditor(QDialog):
     def __init__(self, existing: Optional[Dict[str, Any]] = None, dark: bool = True, on_save=None):
         super().__init__()
@@ -32,38 +27,82 @@ class LaunchEditor(QDialog):
         self.setMinimumSize(740, 580)
         self.setModal(True)
         self.on_save = on_save
-        self.default_name_style = f"""
-            QLineEdit {{
-                border: 1px solid {border};
-                border-radius: 6px;
-                background: {base};
-                color: {text};
-                padding: 6px 8px;
-                padding-right: 26px; 
-            }}
-        """
 
+        # === Theme setup (define first, call later) ===
+        def apply_input_theme():
+            all_themes = ThemeManager.load_themes()
+            dark = ThemeManager.is_dark()
+            colors = all_themes["dark" if dark else "light"]
+
+            border = colors["Border"]
+            base = colors["Base"]
+            text = colors["Text"]
+
+            self.default_name_style = f"""
+                QLineEdit {{
+                    border: 1px solid {border};
+                    border-radius: 6px;
+                    background: {base};
+                    color: {text};
+                    padding: 6px 8px;
+                    padding-right: 26px;
+                }}
+            """
+
+            # Apply to inputs if already created
+            if hasattr(self, "name_edit"):
+                self.name_edit.setStyleSheet(self.default_name_style)
+            if hasattr(self, "listw"):
+                for i in range(self.listw.count()):
+                    row = self.listw.itemWidget(self.listw.item(i))
+                    if row:
+                        for edit in row.findChildren(QLineEdit):
+                            edit.setStyleSheet(self.default_name_style)
+
+        def apply_tooltip_theme():
+            """Apply tooltip color scheme based on current theme."""
+            colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+            bg = colors["Hover"]
+            text = colors["Text"]
+            border = colors["Border"]
+
+            # Qt’s tooltip uses the global palette stylesheet, so we override globally
+            self.setStyleSheet(self.styleSheet() + f"""
+                QToolTip {{
+                    background-color: {bg};
+                    color: {text};
+                    border: 1px solid {border};
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                }}
+            """)
+
+        # === UI setup ===
         card = QFrame()
         card.setObjectName("card")
 
         # --- Name field ---
         name_lbl = QLabel("Launcher Name")
-
-        # --- Container for QLineEdit and icon (overlay style) ---
         name_container = QFrame()
         name_container.setStyleSheet("border: none;")
         name_layout = QHBoxLayout(name_container)
         name_layout.setContentsMargins(0, 0, 0, 0)
         name_layout.setSpacing(0)
 
-        # QLineEdit styled normally
+        # QLineEdit
         self.name_edit = QLineEdit(existing["name"] if existing else "")
         self.name_edit.setPlaceholderText("Enter launcher name...")
-        self.name_edit.setStyleSheet(self.default_name_style)
         self.name_edit.setMinimumHeight(32)
         name_layout.addWidget(self.name_edit)
 
-       # --- Trailing info icon (theme-aware via themed_icon) ---
+        # Apply theme after creating name_edit
+        apply_input_theme()
+        apply_tooltip_theme()
+
+        # Connect live updates
+        ThemeManager.instance().theme_changed.connect(lambda _: (apply_input_theme(), apply_tooltip_theme()))
+
+        # --- Info icon ---
         self._name_trailing_action = self.name_edit.addAction(
             themed_icon("info-solid-full.svg"),
             QLineEdit.ActionPosition.TrailingPosition,
@@ -71,38 +110,46 @@ class LaunchEditor(QDialog):
         self._name_trailing_action.setToolTip("Name displayed on the main launcher list.")
         self._name_trailing_action.setEnabled(False)
 
-        # Update the inline icon if theme changes while dialog is open
-        # (Optional) Future-proof placeholder if dynamic theme reload is added.
-        # Currently no signal system exists in ThemeManager, so no need to connect.
-
-
-        # Combine label + field into horizontal layout
+        # --- Name row layout ---
         name_box = QHBoxLayout()
         name_box.setContentsMargins(0, 0, 0, 0)
         name_box.setSpacing(8)
         name_box.addWidget(name_lbl)
         name_box.addWidget(name_container, 1)
 
-        # --- Paths list ---
+        # --- Paths list + Add button row ---
+        paths_row = QHBoxLayout()
+        paths_row.setContentsMargins(0, 0, 0, 0)
+        paths_row.setSpacing(8)
+
         paths_lbl = QLabel("Paths to Launch")
+
+        add_btn = QPushButton()
+        add_btn.setIcon(themed_icon("add.svg"))
+        add_btn.setToolTip("Add new path")
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setFixedSize(36, 36)
+        add_btn.setStyleSheet("border:none; border-radius:6px; padding:4px;")
+        add_btn.clicked.connect(lambda: self._add_row())
+
+        paths_row.addWidget(paths_lbl)
+        paths_row.addStretch(1)       # push button to the right
+        paths_row.addWidget(add_btn)
+
+        # --- List widget setup ---
         self.listw = DraggableList()
         self.listw.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.listw.setDragEnabled(False)
         self.listw.setAcceptDrops(False)
         self.listw.setDropIndicatorShown(False)
 
-        # Theme-based selection color
-        if ThemeManager.is_dark():
-            selected_bg = "#333333"   # slightly lighter than base
-            hover_bg = "#2f2f2f"
-            border_c = "#555555"
-        else:
-            selected_bg = "#eaeaea"   # slightly darker than base
-            hover_bg = "#f3f3f3"
-            border_c = "#c0c0c0"
+        # Theme-based selection colors
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        hover_bg = colors["Hover"]
+        border_c = colors["Border"]
+        selected_bg = hover_bg if ThemeManager.is_dark() else "#eaeaea"
 
-        # ✅ Important: apply style only to items, not to the list widget itself
-        # (so it doesn't break drag/drop rendering)
         self.listw.setStyleSheet(f"""
             QListWidget::item {{
                 background: {base};
@@ -116,34 +163,25 @@ class LaunchEditor(QDialog):
             }}
         """)
 
-
-        # preload rows if editing
+        # --- Preload rows ---
         for p in (existing["paths"] if existing else []):
             self._add_row(p.get("path", ""), p.get("delay", 0.0), p.get("start_option", "Not Maximized"))
 
-        add_btn = QPushButton()
-        add_btn.setIcon(themed_icon("add.svg"))
-        add_btn.setToolTip("Add new path")
-        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.setFixedSize(36, 36)
-        add_btn.setStyleSheet("border:none; border-radius:6px; padding:4px;")
-        add_btn.clicked.connect(lambda: self._add_row())
-
-
+        # --- Inner layout ---
         inner = QVBoxLayout(card)
         inner.setContentsMargins(16, 16, 16, 16)
         inner.setSpacing(10)
         inner.addLayout(name_box)
 
-        # Divider
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setFrameShadow(QFrame.Shadow.Sunken)
         inner.addWidget(divider)
 
-        inner.addWidget(paths_lbl)
+        # Add the row (label + button) above the list
+        inner.addLayout(paths_row)
         inner.addWidget(self.listw, 1)
-        inner.addWidget(add_btn)
+
 
         # --- Footer ---
         save_btn = QPushButton("💾  Save Launch")
@@ -153,7 +191,7 @@ class LaunchEditor(QDialog):
         footer.addWidget(cancel_btn)
         footer.addWidget(save_btn)
 
-        # --- Inline message label ---
+        # --- Inline message ---
         self.msg_label = QLabel("")
         self.msg_label.setStyleSheet("font-size:12px; color:#f39c12;")
 
@@ -162,7 +200,7 @@ class LaunchEditor(QDialog):
         root.setContentsMargins(24, 18, 24, 18)
         root.setSpacing(12)
         root.addWidget(card, 1)
-        root.addWidget(self.msg_label)  
+        root.addWidget(self.msg_label)
         root.addLayout(footer)
 
         cancel_btn.clicked.connect(self.reject)
