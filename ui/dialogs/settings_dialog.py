@@ -111,6 +111,21 @@ class SettingsDialog(QDialog):
         tray_row.addWidget(self.tray_switch)
         launch_card.layout().addLayout(tray_row)
 
+        # === Debug Logging (On/Off) ===
+        log_row = QHBoxLayout()
+        log_label = QLabel("Debug Logging")
+        log_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        log_row.addWidget(log_label)
+        log_row.addStretch()
+
+        current_debug = ThemeManager.get_setting("debug_logging", True)  # default ON
+        self.debug_switch = ToggleSwitch(initial_state=current_debug)
+        self.debug_switch.clicked.connect(
+            lambda: ThemeManager.set_setting("debug_logging", self.debug_switch.isChecked())
+        )
+        log_row.addWidget(self.debug_switch)
+        launch_card.layout().addLayout(log_row)
+
 
         # === Assemble main view ===
         root.addWidget(appearance_card)
