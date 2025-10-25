@@ -1,12 +1,17 @@
 # ui/dialogs/settings_dialog.py
-from PyQt6.QtWidgets import (
-    QDialog, QFrame, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QComboBox, QDoubleSpinBox, QSpacerItem, QSizePolicy
-)
-from PyQt6.QtCore import Qt
-from ui.widgets.toggle_switch import ToggleSwitch
-from ..theme_manager import ThemeManager
 import os
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
+from PyQt6.QtWidgets import (QApplication, QComboBox, QDialog, QDoubleSpinBox,
+                             QFrame, QHBoxLayout, QLabel, QListWidget,
+                             QListWidgetItem, QMainWindow, QMenu, QMessageBox,
+                             QPushButton, QSizePolicy, QSpacerItem,
+                             QSystemTrayIcon, QVBoxLayout, QWidget)
+
+from ui.widgets.toggle_switch import ToggleSwitch
+
+from ..theme_manager import ThemeManager
 
 ICON_SUN = os.path.join("resources", "icons", "light icons", "sun.png")
 ICON_MOON = os.path.join("resources", "icons", "dark icons", "moon.svg")
@@ -90,6 +95,22 @@ class SettingsDialog(QDialog):
         self.delay_spin.setFixedWidth(100)
         delay_row.addWidget(self.delay_spin)
         launch_card.layout().addLayout(delay_row)
+
+        # === Minimize to Tray ===
+        tray_row = QHBoxLayout()
+        tray_label = QLabel("Minimize to Tray on Close")
+        tray_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        tray_row.addWidget(tray_label)
+        tray_row.addStretch()
+
+        current_tray = ThemeManager.get_setting("minimize_to_tray", False)
+        self.tray_switch = ToggleSwitch(initial_state=current_tray)
+        self.tray_switch.clicked.connect(
+            lambda: ThemeManager.set_setting("minimize_to_tray", self.tray_switch.isChecked())
+        )
+        tray_row.addWidget(self.tray_switch)
+        launch_card.layout().addLayout(tray_row)
+
 
         # === Assemble main view ===
         root.addWidget(appearance_card)

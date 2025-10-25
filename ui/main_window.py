@@ -1,22 +1,26 @@
 # ui/main_window.py
-import sys, os, threading, asyncio, re
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QFrame, QMessageBox, QApplication, QSizePolicy, QMenu
-)
-from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtGui import QAction, QIcon, QCursor
+import asyncio
+import os
+import re
+import sys
+import threading
 from typing import cast
-from ui.theme_manager import ThemeManager
-from ui.dialogs.launch_editor import LaunchEditor       
-from ui.dialogs.settings_dialog import SettingsDialog   
+
+import pythoncom
+from PyQt6.QtCore import QSize, QStandardPaths, Qt, QTimer
+from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel,
+                             QListWidget, QListWidgetItem, QMainWindow, QMenu,
+                             QPushButton, QSystemTrayIcon, QVBoxLayout, QWidget)
+from win32com.client import Dispatch
+
 from core.app_settings import APP_SETTINGS
 from core.launcher_logic import run_launch_sequence
 from core.storage import load_launches, save_launches
-from PyQt6.QtCore import QStandardPaths
-from win32com.client import Dispatch
-import pythoncom
+from ui.dialogs.launch_editor import LaunchEditor
+from ui.dialogs.settings_dialog import SettingsDialog
 from ui.icon_loader import themed_icon
+from ui.theme_manager import ThemeManager
 
 
 def _sanitize_filename(name: str) -> str:
@@ -140,6 +144,11 @@ class MainWindow(QMainWindow):
         content.addWidget(self.status_label)
 
         self._refresh_list()
+
+        # === Tray Icon Setup ===
+        self.tray_icon = None
+        self._setup_tray_icon()
+
 
     def refresh_theme(self, is_dark: bool):
         self._apply_menu_style()
@@ -328,3 +337,75 @@ class MainWindow(QMainWindow):
 
         dlg = SettingsDialog(self, dark=ThemeManager.is_dark(), on_changed=on_changed)
         dlg.exec()
+
+        # === Tray Logic ===
+    def _setup_tray_icon(self):
+        """Initialize tray icon and its context menu."""
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "resources", "icons", "AppLauncher.ico")
+        if not os.path.exists(icon_path) and getattr(sys, "frozen", False):
+            # PyInstaller safe path
+            if hasattr(sys, "_MEIPASS"):
+                icon_path = os.path.join(sys._MEIPASS, "resources", "icons", "AppLauncher.ico")
+
+        tray_icon = QSystemTrayIcon(QIcon(icon_path), self)
+        tray_icon.setToolTip(APP_NAME)
+
+        menu = QMenu()
+        act_open = QAction("Open App", self)
+        act_quit = QAction("Exit", self)
+        menu.addAction(act_open)
+        menu.addSeparator()
+        menu.addAction(act_quit)
+
+        act_open.triggered.connect(self._restore_from_tray)
+        act_quit.triggered.connect(QApplication.instance().quit)
+
+        tray_icon.setContextMenu(menu)
+        tray_icon.activated.connect(self._on_tray_activated)
+        tray_icon.show()
+
+        self.tray_icon = tray_icon
+
+    def _on_tray_activated(self, reason):
+        """Handle click events on tray icon."""
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self._restore_from_tray()
+
+    def _restore_from_tray(self):
+        """Fully restore main window and make it visible on the Windows taskbar."""
+        # If window was hidden, ensure it is re-registered as a normal window
+        flags = self.windowFlags()
+        # Remove Tool and Frameless flags if they were implicitly set by Qt
+        flags &= ~Qt.WindowType.Tool
+        flags |= Qt.WindowType.Window
+        self.setWindowFlags(flags)
+
+        # Explicitly show in taskbar again (Qt.WindowStaysOnTopHint fix)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+
+        # Apply and show
+        self.showNormal()
+        self.show()           # ensures visibility
+        self.raise_()
+        self.activateWindow()
+
+        # Re-add it to taskbar (Windows only)
+        self.setWindowState(Qt.WindowState.WindowActive)
+
+
+    def closeEvent(self, event: QCloseEvent):
+        """Override close behavior for minimize-to-tray feature."""
+        minimize_to_tray = ThemeManager.get_setting("minimize_to_tray", False)
+        if minimize_to_tray:
+            event.ignore()
+            self.hide()
+            if self.tray_icon:
+                self.tray_icon.showMessage(
+                    APP_NAME,
+                    "Application minimized to tray.",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    2000
+                )
+        else:
+            event.accept()
+
