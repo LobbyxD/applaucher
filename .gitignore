@@ -42,7 +42,6 @@ desktop.ini
 /warn-*.txt
 /xref-*.html
 /localpycs/
-/__pycache__
 
 # -------------------------------
 # Local AppData saves (user data)
@@ -79,14 +78,3 @@ pytest_cache/
 .git/
 .gitignore
 
-# -------------------------------
-# Only keep essential build files
-# -------------------------------
-!main.py
-!build.py
-!make_icon.py
-!app_settings.json
-!README.md
-!core/**
-!ui/**
-!resources/**

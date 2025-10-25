@@ -94,6 +94,8 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 16)
         root.setSpacing(0)
         app_menu = cast(QMenu, self.menuBar().addMenu("File")) # type: ignore[reportOptionalMemberAccess]
+        self._apply_menu_style()
+
 
         act_settings = QAction("Settings…", self)
         act_quit = QAction("Quit", self)
@@ -103,13 +105,6 @@ class MainWindow(QMainWindow):
 
         act_settings.triggered.connect(self._open_settings)
         act_quit.triggered.connect(self.close)
-
-        # --- top dark bar ---
-        self.top_bar = QFrame()
-        self.top_bar.setFixedHeight(36)
-        self.top_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._apply_topbar_color()
-        root.addWidget(self.top_bar)
 
         # --- content area ---
         content = QVBoxLayout()
@@ -147,14 +142,46 @@ class MainWindow(QMainWindow):
         self._refresh_list()
 
     def refresh_theme(self, is_dark: bool):
+        self._apply_menu_style()
         """Reapply icons and colors when theme toggles."""
         self.add_btn.setIcon(themed_icon("add.svg"))
-        self._apply_topbar_color()
         for i in range(self.listw.count()):
             item = self.listw.item(i)
             row = self.listw.itemWidget(item)
             if hasattr(row, "refresh_icons"):
                 row.refresh_icons()
+
+    def _apply_menu_style(self):
+        """Apply theme-aware bottom border to menu bar."""
+        all_themes = ThemeManager.load_themes()
+        dark = ThemeManager.is_dark()
+        colors = all_themes["dark" if dark else "light"]
+
+        border = colors["Border"]
+        bg = colors["Window"]
+        text = colors["Text"]
+        hover = colors["Hover"]
+
+        self.menuBar().setStyleSheet(f"""
+            QMenuBar {{
+                background-color: {bg};
+                color: {text};
+                border: none;
+                border-bottom: 1px solid {border};
+            }}
+            QMenuBar::item:selected {{
+                background-color: {hover};
+            }}
+            QMenu {{
+                background-color: {bg};
+                color: {text};
+                border: 1px solid {border};
+            }}
+            QMenu::item:selected {{
+                background-color: {hover};
+            }}
+        """)
+
 
     def _show_message(self, text: str, duration: int = 3000):
         """Show a small fading status message."""
@@ -163,11 +190,6 @@ class MainWindow(QMainWindow):
             "font-size:12px; opacity:1.0; padding-right:6px;"
         )
         QTimer.singleShot(duration, lambda: self.status_label.setText(""))
-
-    def _apply_topbar_color(self):
-        dark = ThemeManager.is_dark()
-        color = "#1e1e1e" if dark else "#e0e0e0"
-        self.top_bar.setStyleSheet(f"background-color: {color}; border:none;")
 
     def _refresh_list(self):
         self.listw.clear()
@@ -303,7 +325,6 @@ class MainWindow(QMainWindow):
             ThemeManager.set_dark(v)
             app = cast(QApplication, QApplication.instance())
             ThemeManager.apply(app, v)
-            self._apply_topbar_color()
 
         dlg = SettingsDialog(self, dark=ThemeManager.is_dark(), on_changed=on_changed)
         dlg.exec()

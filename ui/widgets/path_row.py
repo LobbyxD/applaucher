@@ -12,10 +12,17 @@ MODES = ["Not Maximized", "Maximized", "Minimized"]
 
 
 # ui/widgets/path_row.py
-# ...
 class PathRow(QWidget):
-    def __init__(self, path: str = "", delay: float = 0.0, mode: str = "Not Maximized"):
+    def __init__(self, path: str = "", delay: float = None, mode: str = None):
         super().__init__()
+
+        from ui.theme_manager import ThemeManager
+        if delay is None:
+            delay = float(ThemeManager.get_setting("default_delay", 0))
+        if mode is None:
+            default_state = ThemeManager.get_setting("default_window_state", "Normal")
+            # Map stored 'Normal' → UI text 'Not Maximized'
+            mode = "Not Maximized" if default_state == "Normal" else default_state
 
         # --- Widgets ---
         self.path_edit = QLineEdit(path)
