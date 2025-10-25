@@ -1,17 +1,13 @@
 # ui/dialogs/settings_dialog.py
 from PyQt6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton
+    QLabel, QPushButton, QComboBox, QDoubleSpinBox, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import QStandardPaths
 from PyQt6.QtCore import Qt
 from ui.widgets.toggle_switch import ToggleSwitch
 from ..theme_manager import ThemeManager
-import os, json
-from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox
+import os
 
-
-# Icon paths
 ICON_SUN = os.path.join("resources", "icons", "light icons", "sun.png")
 ICON_MOON = os.path.join("resources", "icons", "dark icons", "moon.svg")
 
@@ -19,33 +15,23 @@ ICON_MOON = os.path.join("resources", "icons", "dark icons", "moon.svg")
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, dark: bool = True, on_changed=None):
         super().__init__(parent)
-        SETTINGS_FILE = os.path.join(
-                QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation),
-                "App Launcher",
-                "settings.json"
-            )
         self.setWindowTitle("Settings")
         self.setModal(True)
+        self.setFixedWidth(460)
         self.on_changed = on_changed
 
-        # === Main Layout ===
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
+        # === Root layout ===
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
 
-        # === Card Frame ===
-        card = QFrame()
-        card.setObjectName("card")
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(20, 20, 20, 20)
-        card_layout.setSpacing(12)
+        # === Section: Appearance ===
+        appearance_card = self._create_section("Appearance")
+        appearance_card.setStyleSheet("background: transparent;")
 
-        # === THEME SECTION ===
         theme_row = QHBoxLayout()
-        theme_row.setContentsMargins(0, 0, 0, 0)
         theme_label = QLabel("Theme")
-        theme_label.setStyleSheet("font-size: 14px; background: transparent;")
+        theme_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
         theme_row.addWidget(theme_label)
         theme_row.addStretch()
 
@@ -57,12 +43,16 @@ class SettingsDialog(QDialog):
         )
         self.theme_switch.clicked.connect(self.toggle_theme)
         theme_row.addWidget(self.theme_switch)
-        card_layout.addLayout(theme_row)
+        appearance_card.layout().addLayout(theme_row)
 
-        # === DEFAULT WINDOW STATE ===
+        # === Section: Launch Defaults ===
+        launch_card = self._create_section("Launch Defaults")
+        launch_card.setStyleSheet("background: transparent;")
+
+        # Default Window State
         state_row = QHBoxLayout()
         state_label = QLabel("Default Window State")
-        state_label.setStyleSheet("font-size: 14px; background: transparent;")
+        state_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
         state_row.addWidget(state_label)
         state_row.addStretch()
         self.state_combo = QComboBox()
@@ -72,16 +62,16 @@ class SettingsDialog(QDialog):
         self.state_combo.currentTextChanged.connect(
             lambda v: ThemeManager.set_setting("default_window_state", v)
         )
+        self.state_combo.setFixedWidth(160)
         state_row.addWidget(self.state_combo)
-        card_layout.addLayout(state_row)
+        launch_card.layout().addLayout(state_row)
 
-        # === DEFAULT DELAY BETWEEN APPS ===
+        # Default Delay
         delay_row = QHBoxLayout()
         delay_label = QLabel("Default Delay Between Apps")
-        delay_label.setStyleSheet("font-size: 14px; background: transparent;")
+        delay_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
         delay_row.addWidget(delay_label)
         delay_row.addStretch()
-
         self.delay_spin = QDoubleSpinBox()
         self.delay_spin.setRange(0, 9999)
         self.delay_spin.setSuffix(" sec")
@@ -97,39 +87,157 @@ class SettingsDialog(QDialog):
             ThemeManager.set_setting("default_delay", rounded)
 
         self.delay_spin.editingFinished.connect(_normalize_delay)
+        self.delay_spin.setFixedWidth(100)
         delay_row.addWidget(self.delay_spin)
-        card_layout.addLayout(delay_row)
+        launch_card.layout().addLayout(delay_row)
 
+        # === Assemble main view ===
+        root.addWidget(appearance_card)
+        root.addWidget(launch_card)
+        root.addSpacerItem(QSpacerItem(0, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # === Footer Buttons ===
+        # === Footer ===
+        footer = QHBoxLayout()
+        footer.addStretch()
         close_btn = QPushButton("Close")
+        close_btn.setFixedWidth(100)
         close_btn.clicked.connect(self.accept)
+        footer.addWidget(close_btn)
+        root.addLayout(footer)
 
-        # === Assemble ===
-        main_layout.addWidget(card)
-        main_layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
+         # === Theme-aware Styling (Fixed + Auto-refresh) ===
+        def apply_theme_styles():
+            all_themes = ThemeManager.load_themes()
+            dark = ThemeManager.is_dark()
+            colors = all_themes["dark" if dark else "light"]
 
-        # Optional styling (depends on your theme system)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: palette(base);
-            }
-            #card {
-                background-color: palette(window);
-                border-radius: 8px;
-            }
-            QPushButton {
-                padding: 6px 16px;
-            }
-        """)
-        
+            # Color references
+            bg_card = colors["Window"] if not dark else "#252525"
+            border = colors["Border"]
+            text = colors["Text"]
+            hover = colors["Hover"]
+            button = colors["Button"]
+            button_text = colors["ButtonText"]
+
+            # === Determine correct arrow icons ===
+            theme_dir = "dark" if dark else "light"
+            up_arrow = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_up.svg").replace("\\", "/")
+            down_arrow = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_down.svg").replace("\\", "/")
+
+            # Use only supported Qt properties (no transition, shadow, or blur)
+            self.setStyleSheet(f"""
+                QDialog {{
+                    background-color: {colors["Base"]};
+                    border: none;
+                }}
+                /* --- Card Containers --- */
+                QFrame#SectionCard {{
+                    background-color: {bg_card};
+                    border: 1px solid {border};
+                    border-radius: 12px;
+                    margin-bottom: 14px;
+                    padding: 10px 16px;
+                }}
+                QLabel#SectionTitle {{
+                    color: {text};
+                    font-weight: 600;
+                    font-size: 15px;
+                    padding-bottom: 4px;
+                }}
+                QFrame#SectionUnderline {{
+                    background-color: {hover};
+                    border: none;
+                    height: 2px;
+                    border-radius: 1px;
+                    margin-bottom: 8px;
+                }}
+                QLabel {{
+                    color: {text};
+                }}
+                /* --- Form Controls --- */
+                QComboBox, QDoubleSpinBox {{
+                    background-color: {button};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    padding: 4px 10px;
+                    min-height: 30px;
+                    color: {button_text};
+                }}
+                QComboBox:hover, QDoubleSpinBox:hover {{
+                    border: 1px solid {hover};
+                }}
+                QPushButton {{
+                    background-color: {button};
+                    color: {button_text};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    padding: 6px 16px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {hover};
+                }}
+                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                    width: 18px;
+                    border: none;
+                    background: transparent;
+                }}
+                QDoubleSpinBox::up-arrow {{
+                    image: url({up_arrow});
+                    width: 10px;
+                    height: 10px;
+                }}
+                QDoubleSpinBox::down-arrow {{
+                    image: url({down_arrow});
+                    width: 10px;
+                    height: 10px;
+                }}
+                QDoubleSpinBox::up-button:hover,
+                QDoubleSpinBox::down-button:hover {{
+                    background-color: {hover};
+                    border-radius: 6px;
+                }}
+            """)
+
+        # Apply now
+        apply_theme_styles()
+
+        # React to future theme changes (dark/light toggle)
+        if hasattr(ThemeManager, "instance"):
+            ThemeManager.instance().theme_changed.connect(lambda _: apply_theme_styles())
+
+
+    # === Helper: Create section wrapper ===
+    def _create_section(self, title: str) -> QFrame:
+        """Clean modern section with clear separation using native Qt visuals."""
+        card = QFrame()
+        card.setObjectName("SectionCard")
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # Header row
+        title_label = QLabel(title)
+        title_label.setObjectName("SectionTitle")
+        title_label.setStyleSheet("font-weight: 700; text-decoration: underline;")
+        layout.addWidget(title_label)
+
+        underline = QFrame()
+        underline.setObjectName("SectionUnderline")
+        underline.setFrameShape(QFrame.Shape.HLine)
+        underline.setFrameShadow(QFrame.Shadow.Plain)
+        underline.setFixedHeight(2)
+        layout.addWidget(underline)
+
+        return card
+
+
+
     # === Toggle Theme Logic ===
     def toggle_theme(self):
-        # ON = dark, OFF = light
         new_theme = "dark" if self.theme_switch.isChecked() else "light"
-
         ThemeManager.set_setting("theme", new_theme)
         ThemeManager.apply_theme(new_theme)
-
         if self.on_changed:
             self.on_changed(new_theme == "dark")

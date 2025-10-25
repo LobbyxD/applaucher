@@ -236,9 +236,9 @@ class LaunchEditor(QDialog):
 
 
     # --- Helper to add new path rows ---
-    def _add_row(self, path="", delay=0.0, mode="Not Maximized"):
+    def _add_row(self, path=None, delay=None, mode=None):
         item = QListWidgetItem(self.listw)
-        w = PathRow(path, delay, mode)
+        w = PathRow(path or "", delay, mode)
         item.setSizeHint(QSize(0, 50))
         self.listw.addItem(item)
         self.listw.setItemWidget(item, w)
