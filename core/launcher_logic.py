@@ -1,13 +1,14 @@
 import asyncio
 import datetime
 import os
+import shlex
 import subprocess
-
-import psutil
 import win32con
 import win32process
 from PyQt6.QtCore import QStandardPaths
+
 from ui.theme_manager import ThemeManager
+
 
 # --- Debug Logging ---
 def log(message: str, exc: Exception | None = None):
@@ -60,14 +61,30 @@ async def launch_app(path: str, delay: float, start_option: str):
         creation_flags = win32process.DETACHED_PROCESS
 
     # Detect .bat files and use cmd /c to run them silently
-    if path.lower().endswith(".bat"):
+
+
+    # --- Handle file types correctly ---
+    if path.lower().endswith(".bat") or path.lower().endswith(".cmd"):
         subprocess.Popen(
             ["cmd.exe", "/c", path],
             startupinfo=si,
             creationflags=creation_flags
         )
+    elif path.lower().endswith(".lnk"):
+        # Use Windows shell to open .lnk exactly like double-click
+        try:
+            os.startfile(path)
+        except Exception as e:
+            log(f"❌ Failed to open shortcut {path}", e)
+            raise
     else:
-        subprocess.Popen([path], startupinfo=si, creationflags=creation_flags)
+        # Normal executable
+        try:
+            subprocess.Popen(shlex.split(path), startupinfo=si, creationflags=creation_flags)
+        except Exception as e:
+            log(f"❌ Failed to launch process {path}", e)
+            raise
+
 
     # don't delay here, delays handled in sequence
 

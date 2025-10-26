@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import QApplication
 
 from core.app_settings import APP_SETTINGS
 from core.launcher_logic import run_launch_sequence
-from core.storage import load_launches
+from core.storage import (LAUNCHERS_FILE_NAME, get_data_path, load_launches,
+                          save_launches)
 from ui.main_window import MainWindow
 from ui.theme_manager import ThemeManager
 
@@ -39,6 +40,24 @@ if __name__ == "__main__":
         sys.exit(0)
 
     app = QApplication(sys.argv)
+
+        # === First-run setup ===
+
+
+    # Ensure AppData directories & defaults exist
+    ThemeManager.ensure_appdir()
+    ThemeManager.ensure_default_themes()
+    ThemeManager.ensure_default_settings()
+
+    # Ensure launchers_config.json exists (using global name)
+    launches_file = get_data_path()
+    if not os.path.exists(launches_file):
+        try:
+            save_launches([])  # create empty file
+        except Exception as e:
+            print(f"⚠️ Could not initialize launch data: {e}")
+
+
 
     icon_path = os.path.join(os.path.dirname(__file__), APP_SETTINGS["icon_path"])
     if os.path.exists(icon_path):

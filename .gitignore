@@ -1,7 +1,6 @@
 # -------------------------------
 # Core Python ignore patterns
 # -------------------------------
-__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
@@ -14,6 +13,8 @@ env/
 venv/
 build/
 dist/
+__pycache__/
+release/
 *.spec
 
 # -------------------------------

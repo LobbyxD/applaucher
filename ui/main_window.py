@@ -1,21 +1,21 @@
 # ui/main_window.py
-import asyncio
+import json
 import os
 import re
 import sys
-import threading
 from typing import cast
 
 import pythoncom
-from PyQt6.QtCore import QSize, QStandardPaths, Qt, QTimer
+from PyQt6.QtCore import (QObject, QSize, QStandardPaths, Qt, QThread, QTimer,
+                          pyqtSignal)
 from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
-from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QFrame,
-                             QListWidget, QListWidgetItem, QMainWindow, QMenu,
-                             QPushButton, QSystemTrayIcon, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout,
+                             QLabel, QListWidget, QListWidgetItem, QMainWindow,
+                             QMenu, QPushButton, QSystemTrayIcon, QVBoxLayout,
+                             QWidget)
 from win32com.client import Dispatch
 
 from core.app_settings import APP_SETTINGS
-from core.launcher_logic import run_launch_sequence
 from core.storage import load_launches, save_launches
 from ui.dialogs.launch_editor import LaunchEditor
 from ui.dialogs.settings_dialog import SettingsDialog
@@ -26,8 +26,6 @@ from ui.theme_manager import ThemeManager
 def _sanitize_filename(name: str) -> str:
     # Windows-invalid chars: <>:"/\|?*
     return re.sub(r'[<>:"/\\|?*]', "_", name).strip()
-
-
 
 APP_NAME = APP_SETTINGS["window_title"]
 
@@ -83,6 +81,42 @@ class LaunchListRow(QWidget):
         self.edit_btn.setIcon(themed_icon("edit.svg"))
         self.del_btn.setIcon(themed_icon("delete.svg"))
         self.export_btn.setIcon(themed_icon("export.svg"))
+
+# --- Qt worker that runs the async sequence off the GUI thread ---
+class LaunchWorker(QObject):
+    progress = pyqtSignal(str)   # status text
+    finished = pyqtSignal(str)   # final message
+
+    def __init__(self, apps, launch_name: str):
+        super().__init__()
+        self.apps = apps
+        self.launch_name = launch_name
+
+    def run(self):
+        """Run the async launch sequence inside its own event loop."""
+        import asyncio
+
+        from core.launcher_logic import run_launch_sequence
+
+        def _emit(text: str, **_):
+            # progress_cb from launcher_logic sometimes passes end="\r"
+            self.progress.emit(text)
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(run_launch_sequence(self.apps, progress_cb=_emit))
+        except Exception as e:
+            # Bubble a concise error back to UI
+            self.finished.emit(f"❌ Error: {e}")
+            return
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+        self.finished.emit(f"{self.launch_name} Launched.")
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -380,14 +414,31 @@ class MainWindow(QMainWindow):
 
 
     def _run_index(self, i):
+        """Run the selected launcher in a QThread and stream progress back via signals."""
         bundle = self.launches[i]
-        def worker():
-            try:
-                asyncio.run(run_launch_sequence(bundle["paths"]))
-                self._show_message(f"{bundle['name']} Launched.")
-            except Exception as e:
-                self._show_message(f"❌ Error: {e}.")
-        threading.Thread(target=worker, daemon=True).start()
+        name = bundle.get("name", "Untitled")
+
+        # 1) Build worker + thread
+        self._launch_thread = QThread(self)
+        self._launch_worker = LaunchWorker(bundle["paths"], name)
+        self._launch_worker.moveToThread(self._launch_thread)
+
+        # 2) Wire signals
+        self._launch_thread.started.connect(self._launch_worker.run)
+        self._launch_worker.progress.connect(self._show_message)
+        self._launch_worker.finished.connect(self._on_launch_finished)
+
+        # 3) Ensure clean teardown
+        self._launch_worker.finished.connect(self._launch_thread.quit)
+        self._launch_thread.finished.connect(self._launch_worker.deleteLater)
+        self._launch_thread.finished.connect(self._launch_thread.deleteLater)
+
+        # 4) Go!
+        self._launch_thread.start()
+
+    def _on_launch_finished(self, msg: str):
+        # Display final status (success or error)
+        self._show_message(msg, duration=3000)
 
     def _open_settings(self):
         def on_changed(v: bool):
@@ -454,9 +505,7 @@ class MainWindow(QMainWindow):
 
         # === Import/Export Launchers ===
     def _export_launchers(self):
-        """Export current launches.json to chosen location."""
-        from PyQt6.QtWidgets import QFileDialog
-        import json
+        """Export current to chosen location."""
 
         downloads = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
         if not downloads or not os.path.exists(downloads):
@@ -481,8 +530,9 @@ class MainWindow(QMainWindow):
 
     def _import_launchers(self):
         """Import launchers from chosen .json file."""
-        from PyQt6.QtWidgets import QFileDialog, QMessageBox
         import json
+
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
         file_path, _ = QFileDialog.getOpenFileName(
             self,

@@ -1,21 +1,29 @@
 import json
 import os
-from PyQt6.QtCore import QObject, QStandardPaths, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QStyleFactory, QWidget
 
+from core.app_settings import APP_SETTINGS
+import core.storage as storage
+
 
 class ThemeManager(QObject):
-    theme_changed = pyqtSignal(bool)  # emits True if dark, False if light
+    theme_changed = pyqtSignal(bool)
     _instance = None
+    _cached_settings = None
 
-    APP_DIR = os.path.join(
-        QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation),
-        "App Launcher"
-    )
+    # --- unified base directories ---
+    APP_NAME = APP_SETTINGS["app_name"]
+    APP_DIR = storage.BASE_DIR  # same folder as launchers_config.json
+    SETTINGS_DIR = os.path.join(APP_DIR, "Settings")
 
-    SETTINGS_FILE = os.path.join(APP_DIR, "settings.json")
-    THEMES_FILE = os.path.join(APP_DIR, "themes.json")
+    # Ensure folder hierarchy always exists
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
+
+    SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
+    THEMES_FILE = os.path.join(SETTINGS_DIR, "themes.json")
+
 
     DEFAULT_THEMES = {
         "dark": {
@@ -59,8 +67,8 @@ class ThemeManager(QObject):
     # === AppData folder helpers ===
     @staticmethod
     def ensure_appdir():
-        """Ensure %APPDATA%/App Launcher/ exists."""
-        os.makedirs(ThemeManager.APP_DIR, exist_ok=True)
+        """Ensure full AppData hierarchy exists (%APPDATA%/App Launcher/Settings)."""
+        os.makedirs(ThemeManager.SETTINGS_DIR, exist_ok=True)
 
     @staticmethod
     def ensure_default_themes():
@@ -81,35 +89,48 @@ class ThemeManager(QObject):
     # === Settings I/O ===
     @staticmethod
     def _load_settings() -> dict:
-        """Load settings.json; create defaults if missing or broken."""
+        """Load settings.json; create defaults only on first run."""
+        # Try using cached copy first
+        if ThemeManager._cached_settings is not None:
+            return ThemeManager._cached_settings
+
+        settings_file = ThemeManager.SETTINGS_FILE
         ThemeManager.ensure_appdir()
-        ThemeManager.ensure_default_settings()
+
+        if not os.path.exists(settings_file):
+            # First ever run → create defaults
+            with open(settings_file, "w", encoding="utf-8") as f:
+                json.dump(ThemeManager.DEFAULT_SETTINGS, f, indent=2)
+            ThemeManager._cached_settings = ThemeManager.DEFAULT_SETTINGS.copy()
+            return ThemeManager._cached_settings
 
         try:
-            with open(ThemeManager.SETTINGS_FILE, "r", encoding="utf-8") as f:
+            with open(settings_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            # Corrupted file → rewrite defaults
-            with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
-                json.dump(ThemeManager.DEFAULT_SETTINGS, f, indent=2)
-            return ThemeManager.DEFAULT_SETTINGS.copy()
+            # Corrupted file → fallback to defaults (but don’t write)
+            data = ThemeManager.DEFAULT_SETTINGS.copy()
 
-        # 🔁 Auto-fill missing keys (non-destructive update)
-        updated = False
+        # Auto-fill missing keys
         for key, value in ThemeManager.DEFAULT_SETTINGS.items():
-            if key not in data:
-                data[key] = value
-                updated = True
-        if updated:
-            ThemeManager._save_settings(data)
+            data.setdefault(key, value)
 
+        ThemeManager._cached_settings = data
         return data
 
     @staticmethod
     def _save_settings(data: dict):
-        ThemeManager.ensure_appdir()
-        with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        """Safely save settings only if the folder still exists."""
+        ThemeManager._cached_settings = data
+        base_dir = os.path.dirname(ThemeManager.SETTINGS_FILE)
+        if not os.path.exists(base_dir):
+            print("⚠️ Settings folder missing — skipping save to avoid unwanted recreation.")
+            return
+        try:
+            with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Failed to write settings.json: {e}")
 
     @staticmethod
     def get_setting(key, default=None):

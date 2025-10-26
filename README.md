@@ -131,10 +131,10 @@ The app will launch with your local Python environment and automatically use you
 
 ## 📁 AppData storage locations
 
-| Type                  | Location                               | Description              |
-| --------------------- | -------------------------------------- | ------------------------ |
-| Launch configurations | `%AppData%/App Launcher/launches.json` | Saved user launcher data |
-| Theme settings        | `%AppData%/App Launcher/settings.json` | Dark/Light mode          |
+| Type                  | Location                                       | Description              |
+| --------------------- | ---------------------------------------------- | ------------------------ |
+| Launch configurations | `%AppData%/App Launcher/launchers_config.json` | Saved user launcher data |
+| Theme settings        | `%AppData%/App Launcher/settings.json`         | Dark/Light mode          |
 
 These are automatically created — no manual setup required.
 
