@@ -1,0 +1,6 @@
+# requirements-dev.txt
+# This file installs runtime + build dependencies.
+
+-r requirements.txt
+pyinstaller
+pyinstaller-hooks-contrib
