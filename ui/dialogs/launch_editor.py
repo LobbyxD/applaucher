@@ -6,7 +6,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (QDialog, QFrame, QGraphicsColorizeEffect,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QPushButton, QSizePolicy,
-                             QToolButton, QVBoxLayout)
+                             QToolButton, QVBoxLayout, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
@@ -16,13 +16,23 @@ from ui.widgets.path_row import PathRow
 MODES = ["Not Maximized", "Maximized", "Minimized"]
 
 class LaunchEditor(QDialog):
-    def __init__(self, existing: Optional[Dict[str, Any]] = None, dark: bool = True, on_save=None):
-        super().__init__()
+    def __init__(
+        self,
+        existing: Optional[Dict[str, Any]] = None,
+        dark: bool = True,
+        on_save=None,
+        parent: Optional[QWidget] = None,
+    ):
+        # ✅ Always initialize the QDialog base first
+        super().__init__(parent)
+
+        # ✅ Now it's safe to access QWidget methods
         if existing:
             name = existing.get("name", "Launcher")
             self.setWindowTitle(f"Edit {name}")
         else:
             self.setWindowTitle("Create Launcher")
+
         self.setMinimumSize(740, 580)
         self.setModal(True)
         self.on_save = on_save

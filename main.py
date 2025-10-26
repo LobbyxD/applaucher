@@ -48,6 +48,7 @@ if __name__ == "__main__":
     ThemeManager.ensure_appdir()
     ThemeManager.ensure_default_themes()
     ThemeManager.ensure_default_settings()
+    ThemeManager.lock_config_files()
 
     # Ensure launchers_config.json exists (using global name)
     launches_file = get_data_path()

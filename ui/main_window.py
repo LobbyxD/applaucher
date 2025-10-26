@@ -12,7 +12,7 @@ from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout,
                              QLabel, QListWidget, QListWidgetItem, QMainWindow,
                              QMenu, QPushButton, QSystemTrayIcon, QVBoxLayout,
-                             QWidget)
+                             QWidget, QDialog)
 from win32com.client import Dispatch
 
 from core.app_settings import APP_SETTINGS
@@ -325,8 +325,20 @@ class MainWindow(QMainWindow):
             save_launches(self.launches)
             self._refresh_list()
             self._show_message(f"Created {data.get('name', 'Untitled')} successfully.")
-        dlg = LaunchEditor(on_save=on_save)
-        dlg.exec()
+
+        dlg = LaunchEditor(on_save=on_save, parent=self)
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setWindowFlag(Qt.WindowType.Dialog, True)
+        dlg.setWindowFlag(Qt.WindowType.Window, False)
+        dlg.setWindowFlag(Qt.WindowType.SubWindow, True)
+        dlg.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        dlg.setWindowFlag(Qt.WindowType.Tool, True)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+        # The minimize/restore sync is handled via changeEvent() override.
+
 
     def _edit_index(self, i):
         def on_save(data):
@@ -334,8 +346,19 @@ class MainWindow(QMainWindow):
             save_launches(self.launches)
             self._refresh_list()
             self._show_message(f"{data.get('name', 'Untitled')} Updated.")
-        dlg = LaunchEditor(existing=self.launches[i], on_save=on_save)
-        dlg.exec()
+
+        dlg = LaunchEditor(existing=self.launches[i], on_save=on_save, parent=self)
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setWindowFlag(Qt.WindowType.Dialog, True)
+        dlg.setWindowFlag(Qt.WindowType.Window, False)
+        dlg.setWindowFlag(Qt.WindowType.SubWindow, True)
+        dlg.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        dlg.setWindowFlag(Qt.WindowType.Tool, True)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+        # The minimize/restore sync is handled via changeEvent() override.
 
     def _delete_index(self, i):
         """Handle delete with inline confirmation instead of QMessageBox."""
@@ -612,6 +635,18 @@ class MainWindow(QMainWindow):
             self._show_message("✅ Launchers imported successfully.")
         elif msg.clickedButton() == replace_btn:
             self._show_message("✅ Launchers replaced successfully.")
+
+    def changeEvent(self, event):
+        """Sync minimize/restore state to all child dialogs like LaunchEditor."""
+        from PyQt6.QtCore import QEvent
+        if event.type() == QEvent.Type.WindowStateChange:
+            is_minimized = self.windowState() & Qt.WindowState.WindowMinimized
+            for child in self.findChildren(QDialog):
+                if is_minimized:
+                    child.showMinimized()
+                else:
+                    child.showNormal()
+        super().changeEvent(event)
 
 
     def closeEvent(self, event: QCloseEvent):

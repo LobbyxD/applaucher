@@ -1,5 +1,7 @@
 import json
 import os
+import msvcrt
+import ctypes
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QStyleFactory, QWidget
@@ -23,7 +25,7 @@ class ThemeManager(QObject):
 
     SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
     THEMES_FILE = os.path.join(SETTINGS_DIR, "themes.json")
-
+    _LOCK_HANDLES = []
 
     DEFAULT_THEMES = {
         "dark": {
@@ -69,6 +71,45 @@ class ThemeManager(QObject):
     def ensure_appdir():
         """Ensure full AppData hierarchy exists (%APPDATA%/App Launcher/Settings)."""
         os.makedirs(ThemeManager.SETTINGS_DIR, exist_ok=True)
+    
+    @staticmethod
+    def lock_config_files():
+        """
+        Hold open handles to settings.json and themes.json so Windows
+        prevents deletion of the Settings folder, while still allowing
+        read/write access from this process and other safe readers.
+        """
+        import win32file
+        import win32con
+
+        files_to_lock = [
+            ThemeManager.SETTINGS_FILE,
+            ThemeManager.THEMES_FILE,
+        ]
+
+        for file_path in files_to_lock:
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                if not os.path.exists(file_path):
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump({}, f)
+
+                # Open with share-read/write but deny delete
+                handle = win32file.CreateFile(
+                    file_path,
+                    win32con.GENERIC_READ | win32con.GENERIC_WRITE,
+                    win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
+                    None,
+                    win32con.OPEN_EXISTING,
+                    win32con.FILE_ATTRIBUTE_NORMAL,
+                    None,
+                )
+
+                ThemeManager._LOCK_HANDLES.append(handle)
+                print(f"🔒 Locked (share-read) {os.path.basename(file_path)}")
+
+            except Exception as e:
+                print(f"⚠️ Could not lock {file_path}: {e}")
 
     @staticmethod
     def ensure_default_themes():
@@ -89,34 +130,35 @@ class ThemeManager(QObject):
     # === Settings I/O ===
     @staticmethod
     def _load_settings() -> dict:
-        """Load settings.json; create defaults only on first run."""
-        # Try using cached copy first
-        if ThemeManager._cached_settings is not None:
-            return ThemeManager._cached_settings
-
+        """Load settings.json, auto-refresh if file changed on disk."""
         settings_file = ThemeManager.SETTINGS_FILE
         ThemeManager.ensure_appdir()
 
-        if not os.path.exists(settings_file):
-            # First ever run → create defaults
-            with open(settings_file, "w", encoding="utf-8") as f:
-                json.dump(ThemeManager.DEFAULT_SETTINGS, f, indent=2)
-            ThemeManager._cached_settings = ThemeManager.DEFAULT_SETTINGS.copy()
-            return ThemeManager._cached_settings
-
+        # --- detect modification ---
+        last_mtime = getattr(ThemeManager, "_last_settings_mtime", None)
         try:
-            with open(settings_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            # Corrupted file → fallback to defaults (but don’t write)
-            data = ThemeManager.DEFAULT_SETTINGS.copy()
+            current_mtime = os.path.getmtime(settings_file)
+        except FileNotFoundError:
+            current_mtime = None
 
-        # Auto-fill missing keys
-        for key, value in ThemeManager.DEFAULT_SETTINGS.items():
-            data.setdefault(key, value)
+        # --- reload if cache empty or file changed ---
+        if ThemeManager._cached_settings is None or current_mtime != last_mtime:
+            try:
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                ThemeManager._cached_settings = data
+                ThemeManager._last_settings_mtime = current_mtime
+                print(f"🔄 Reloaded settings.json (mtime changed).")
+            except Exception as e:
+                print(f"⚠️ Failed to reload settings.json: {e}")
+                ThemeManager._cached_settings = ThemeManager.DEFAULT_SETTINGS.copy()
 
-        ThemeManager._cached_settings = data
-        return data
+        # fill missing defaults (safe)
+        for k, v in ThemeManager.DEFAULT_SETTINGS.items():
+            ThemeManager._cached_settings.setdefault(k, v)
+
+        return ThemeManager._cached_settings
+
 
     @staticmethod
     def _save_settings(data: dict):

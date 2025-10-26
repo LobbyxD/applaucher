@@ -20,6 +20,7 @@ ICON_MOON = os.path.join("resources", "icons", "dark icons", "moon.svg")
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, dark: bool = True, on_changed=None):
         super().__init__(parent)
+        SettingsDialog.refresh_settings_cache()
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.setFixedWidth(460)
@@ -302,3 +303,9 @@ class SettingsDialog(QDialog):
         ThemeManager.apply_theme(new_theme)
         if self.on_changed:
             self.on_changed(new_theme == "dark")
+
+    @staticmethod
+    def refresh_settings_cache():
+        """Force reload from disk, ignoring cache."""
+        ThemeManager._cached_settings = None
+        ThemeManager._load_settings()
