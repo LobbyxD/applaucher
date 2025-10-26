@@ -526,29 +526,42 @@ class MainWindow(QMainWindow):
             return
 
         # --- Ask user to Merge or Replace ---
-        choice = QMessageBox.question(
-            self,
-            "Import Launchers",
-            "Do you want to merge with existing launchers, or replace them?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Yes
-        )
-        # Yes = Merge, No = Replace, Cancel = Abort
-        if choice == QMessageBox.StandardButton.Cancel:
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Import Launchers")
+        msg.setText("Do you want to merge with existing launchers, or replace them?")
+        msg.setIcon(QMessageBox.Icon.Question)
+
+        # Add custom buttons
+        merge_btn = msg.addButton("Merge", QMessageBox.ButtonRole.YesRole)
+        replace_btn = msg.addButton("Replace", QMessageBox.ButtonRole.NoRole)
+        cancel_btn = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+
+        # Default selected button
+        msg.setDefaultButton(merge_btn)
+
+        # Show dialog
+        msg.exec()
+
+        # Handle result (same logic you had before)
+        if msg.clickedButton() == cancel_btn:
             return
-        elif choice == QMessageBox.StandardButton.Yes:
+        elif msg.clickedButton() == merge_btn:
             # Merge (avoid duplicates by name)
             existing_names = {x.get("name") for x in self.launches}
             merged = self.launches + [x for x in imported if x.get("name") not in existing_names]
             self.launches = merged
-        else:
+        elif msg.clickedButton() == replace_btn:
             # Replace
             self.launches = imported
+
 
         # Save and refresh UI
         save_launches(self.launches)
         self._refresh_list()
-        self._show_message("✅ Launchers imported successfully.")
+        if msg.clickedButton() == merge_btn:
+            self._show_message("✅ Launchers imported successfully.")
+        elif msg.clickedButton() == replace_btn:
+            self._show_message("✅ Launchers replaced successfully.")
 
 
     def closeEvent(self, event: QCloseEvent):
