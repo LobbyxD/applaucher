@@ -52,12 +52,6 @@ class PathRow(QWidget):
         self.delay.setSuffix(" s")
         self.delay.setValue(float(delay))
 
-        # Mode dropdown (frameless custom combo)
-        self.mode = ThemedComboBox()
-        self.mode.addItems(MODES)
-        if mode in MODES:
-            self.mode.setCurrentText(mode)
-
         # --- Mode dropdown (modern themed) ---
         self.mode = ThemedComboBox()
         self.mode.addItems(MODES)
@@ -72,7 +66,6 @@ class PathRow(QWidget):
 
         # Apply theme styling
         apply_combobox_style(self.mode)
-
 
         # Delete button
         self.delete_btn = QPushButton()
