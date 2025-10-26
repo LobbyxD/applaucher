@@ -38,35 +38,53 @@ class LaunchEditor(QDialog):
         self.on_save = on_save
 
         # === Theme setup (define first, call later) ===
+
         def apply_input_theme():
+            """Apply theme colors to all QLineEdit and spinbox-like inputs."""
             all_themes = ThemeManager.load_themes()
             dark = ThemeManager.is_dark()
             colors = all_themes["dark" if dark else "light"]
 
             border = colors["Border"]
             base = colors["Base"]
+            hover = colors["Hover"]
             text = colors["Text"]
+
+            # Same contrast logic as PathRow
+            selection_bg = hover
+            selection_text = "#ffffff" if dark else "#000000"
 
             self.default_name_style = f"""
                 QLineEdit {{
                     border: 1px solid {border};
                     border-radius: 6px;
-                    background: {base};
+                    background-color: {base};
                     color: {text};
                     padding: 6px 8px;
-                    padding-right: 26px;
+                    selection-background-color: {selection_bg};
+                    selection-color: {selection_text};
+                }}
+                QLineEdit:hover {{
+                    border: 1px solid {hover};
+                }}
+                QLineEdit:focus {{
+                    border: 1px solid {hover};
+                    background-color: {base};
                 }}
             """
 
             # Apply to inputs if already created
             if hasattr(self, "name_edit"):
                 self.name_edit.setStyleSheet(self.default_name_style)
+
             if hasattr(self, "listw"):
                 for i in range(self.listw.count()):
                     row = self.listw.itemWidget(self.listw.item(i))
-                    if row:
-                        for edit in row.findChildren(QLineEdit):
-                            edit.setStyleSheet(self.default_name_style)
+                    if not row:
+                        continue
+                    for edit in row.findChildren(QLineEdit):
+                        edit.setStyleSheet(self.default_name_style)
+
 
         def apply_tooltip_theme():
             """Apply tooltip color scheme based on current theme."""

@@ -61,48 +61,67 @@ class ThemedComboBox(QComboBox):
         view = self.view()
         popup = view.window()
 
-        # Window setup (frameless, no system shadow)
+        # --- Ensure it's frameless, no drop shadow ---
         popup.setWindowFlags(
             Qt.WindowType.Popup
             | Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.NoDropShadowWindowHint
         )
+
+        # ✅ Make popup *truly transparent* under the styled QListView
+        popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         popup.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         view.setFrameShape(QFrame.Shape.NoFrame)
 
-        # Inject theme-based popup style
+        # --- Theme colors ---
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         border = colors["Border"]
         bg = colors["Base"]
         hover = colors["Hover"]
+        text = colors["Text"]
 
-        popup.setStyleSheet(f"""
-            QFrame {{
+        # --- Style the inner view only (not the popup window) ---
+        view.setStyleSheet(f"""
+            QListView {{
                 background-color: {bg};
+                border: 1px solid {border};
                 border-radius: 8px;
+                outline: none;
             }}
             QListView::item {{
                 padding: 6px 10px;
                 border-radius: 6px;
-                color: {colors["Text"]};
+                color: {text};
             }}
             QListView::item:hover {{
                 background-color: {hover};
             }}
             QListView::item:selected {{
                 background-color: {hover};
-                color: {colors["Text"]};
+                color: {text};
             }}
         """)
 
-        # --- Fix alignment offset ---
-        # Compute popup geometry to start exactly under the combo field
-        popup_rect = self.view().geometry()
+        # --- Align popup exactly under combo field ---
         field_rect = self.rect()
         global_pos = self.mapToGlobal(field_rect.bottomLeft())
-        popup.move(global_pos.x(), global_pos.y() + 1)  # +1 for subtle gap
+        popup.move(global_pos.x(), global_pos.y() + 1)
 
+        # --- Show popup first (creates the native window) ---
         super().showPopup()
+
+        # --- Apply rounded mask to the popup ---
+        from PyQt6.QtGui import QRegion, QPainterPath
+        from PyQt6.QtCore import QRectF
+
+        popup_rect = QRectF(popup.rect())
+        radius = 8
+        path = QPainterPath()
+        path.addRoundedRect(popup_rect, radius, radius)
+        region = QRegion(path.toFillPolygon().toPolygon())
+        popup.setMask(region)
+
+
 
 
 # ui/widgets/path_row.py
@@ -373,7 +392,6 @@ class PathRow(QWidget):
         combo.setStyleSheet(f"""
             /* === Combo Field === */
             QComboBox {{
-                background-color: {base};
                 border: 1px solid {border};
                 border-radius: 8px;
                 padding: 6px 28px 6px 10px;
@@ -397,7 +415,6 @@ class PathRow(QWidget):
 
             /* === Popup view === */
             QComboBox QAbstractItemView {{
-                background-color: {window};
                 border: 1px solid {border};
                 border-radius: 8px;
                 padding: 4px;
