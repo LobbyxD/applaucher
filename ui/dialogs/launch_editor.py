@@ -315,8 +315,6 @@ class LaunchEditor(QDialog):
         # Message label below card (optional, can also move inside if you prefer)
         root.addWidget(self.msg_label)
 
-
-
         cancel_btn.clicked.connect(self.reject)
         save_btn.clicked.connect(self._save)
 

@@ -337,18 +337,19 @@ class MainWindow(QMainWindow):
             self._show_message(f"Created {data.get('name', 'Untitled')} successfully.")
 
         dlg = LaunchEditor(on_save=on_save, parent=self)
-        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
         dlg.setWindowFlag(Qt.WindowType.Dialog, True)
-        dlg.setWindowFlag(Qt.WindowType.Window, False)
-        dlg.setWindowFlag(Qt.WindowType.SubWindow, True)
         dlg.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-        dlg.setWindowFlag(Qt.WindowType.Tool, True)
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
 
+        # ✅ Use exec() for true modal blocking + automatic focus return
+        dlg.exec()
+
+        # ✅ Ensure focus returns to main window after dialog closes
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
+        
         # The minimize/restore sync is handled via changeEvent() override.
-
 
     def _edit_index(self, i):
         def on_save(data):
@@ -358,15 +359,17 @@ class MainWindow(QMainWindow):
             self._show_message(f"{data.get('name', 'Untitled')} Updated.")
 
         dlg = LaunchEditor(existing=self.launches[i], on_save=on_save, parent=self)
-        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
         dlg.setWindowFlag(Qt.WindowType.Dialog, True)
-        dlg.setWindowFlag(Qt.WindowType.Window, False)
-        dlg.setWindowFlag(Qt.WindowType.SubWindow, True)
         dlg.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-        dlg.setWindowFlag(Qt.WindowType.Tool, True)
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+
+        # ✅ Blocking modal dialog (guarantees focus return)
+        dlg.exec()
+
+        # ✅ Ensure main window regains focus after dialog closes
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
 
         # The minimize/restore sync is handled via changeEvent() override.
 
