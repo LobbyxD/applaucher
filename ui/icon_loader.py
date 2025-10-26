@@ -1,7 +1,10 @@
 # ui/icon_loader.py
 import os
+
 from PyQt6.QtGui import QIcon
+
 from ui.theme_manager import ThemeManager
+
 
 def themed_icon(name: str) -> QIcon:
     """

@@ -9,10 +9,10 @@ import pythoncom
 from PyQt6.QtCore import (QObject, QSize, QStandardPaths, Qt, QThread, QTimer,
                           pyqtSignal)
 from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
-from PyQt6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout,
-                             QLabel, QListWidget, QListWidgetItem, QMainWindow,
-                             QMenu, QPushButton, QSystemTrayIcon, QVBoxLayout,
-                             QWidget, QDialog)
+from PyQt6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
+                             QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+                             QMainWindow, QMenu, QPushButton, QSystemTrayIcon,
+                             QVBoxLayout, QWidget)
 from win32com.client import Dispatch
 
 from core.app_settings import APP_SETTINGS

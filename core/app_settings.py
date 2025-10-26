@@ -1,5 +1,8 @@
 # core/app_settings.py
-import os, json, sys
+import json
+import os
+import sys
+
 
 def get_base_dir() -> str:
     """Return correct base directory for both source and PyInstaller build."""

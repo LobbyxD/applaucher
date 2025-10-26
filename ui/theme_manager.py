@@ -1,13 +1,12 @@
 import json
 import os
-import msvcrt
-import ctypes
+
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QStyleFactory, QWidget
 
-from core.app_settings import APP_SETTINGS
 import core.storage as storage
+from core.app_settings import APP_SETTINGS
 
 
 class ThemeManager(QObject):
@@ -79,8 +78,8 @@ class ThemeManager(QObject):
         prevents deletion of the Settings folder, while still allowing
         read/write access from this process and other safe readers.
         """
-        import win32file
         import win32con
+        import win32file
 
         files_to_lock = [
             ThemeManager.SETTINGS_FILE,

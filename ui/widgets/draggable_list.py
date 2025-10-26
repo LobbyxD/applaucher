@@ -1,5 +1,6 @@
-from PyQt6.QtCore import Qt, QPoint, QSize
-from PyQt6.QtWidgets import QListWidget, QLabel, QListWidgetItem, QFrame
+from PyQt6.QtCore import QPoint, QSize, Qt
+from PyQt6.QtWidgets import QFrame, QListWidget, QListWidgetItem
+
 
 class DraggableList(QListWidget):
     """

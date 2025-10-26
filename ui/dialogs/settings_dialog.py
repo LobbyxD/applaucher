@@ -2,13 +2,12 @@
 import os
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QCursor, QIcon
-from PyQt6.QtWidgets import (QApplication, QComboBox, QDialog, QDoubleSpinBox,
-                             QFrame, QHBoxLayout, QLabel, QListWidget,
-                             QListWidgetItem, QMainWindow, QMenu, QMessageBox,
-                             QPushButton, QSizePolicy, QSpacerItem,
-                             QSystemTrayIcon, QVBoxLayout, QWidget)
+from PyQt6.QtGui import QCursor
+from PyQt6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFrame,
+                             QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QSizePolicy, QSpacerItem, QVBoxLayout)
 
+from ui.widgets.style_helpers import apply_combobox_style
 from ui.widgets.toggle_switch import ToggleSwitch
 
 from ..theme_manager import ThemeManager
@@ -69,6 +68,7 @@ class SettingsDialog(QDialog):
             lambda v: ThemeManager.set_setting("default_window_state", v)
         )
         self.state_combo.setFixedWidth(160)
+        apply_combobox_style(self.state_combo)
         state_row.addWidget(self.state_combo)
         launch_card.layout().addLayout(state_row)
 
@@ -153,17 +153,7 @@ class SettingsDialog(QDialog):
 
          # === Theme-aware Styling (Fixed + Auto-refresh) ===
         def apply_theme_styles():
-            all_themes = ThemeManager.load_themes()
             dark = ThemeManager.is_dark()
-            colors = all_themes["dark" if dark else "light"]
-
-            # Color references
-            bg_card = colors["Window"] if not dark else "#252525"
-            border = colors["Border"]
-            text = colors["Text"]
-            hover = colors["Hover"]
-            button = colors["Button"]
-            button_text = colors["ButtonText"]
 
             # === Determine correct arrow icons ===
             theme_dir = "dark" if dark else "light"
@@ -172,76 +162,12 @@ class SettingsDialog(QDialog):
 
             # Use only supported Qt properties (no transition, shadow, or blur)
             self.setStyleSheet(f"""
-                QDialog {{
-                    background-color: {colors["Base"]};
-                    border: none;
-                }}
-                /* --- Card Containers --- */
-                QFrame#SectionCard {{
-                    background-color: {bg_card};
-                    border: 1px solid {border};
-                    border-radius: 12px;
-                    margin-bottom: 14px;
-                    padding: 10px 16px;
-                }}
-                QLabel#SectionTitle {{
-                    color: {text};
-                    font-weight: 600;
-                    font-size: 15px;
-                    padding-bottom: 4px;
-                }}
-                QFrame#SectionUnderline {{
-                    background-color: {hover};
-                    border: none;
-                    height: 2px;
-                    border-radius: 1px;
-                    margin-bottom: 8px;
-                }}
-                QLabel {{
-                    color: {text};
-                }}
                 /* --- Form Controls --- */
-                QComboBox, QDoubleSpinBox {{
-                    background-color: {button};
-                    border: 1px solid {border};
-                    border-radius: 8px;
-                    padding: 4px 10px;
-                    min-height: 30px;
-                    color: {button_text};
-                }}
-                QComboBox:hover, QDoubleSpinBox:hover {{
-                    border: 1px solid {hover};
-                }}
-                QPushButton {{
-                    background-color: {button};
-                    color: {button_text};
-                    border: 1px solid {border};
-                    border-radius: 8px;
-                    padding: 6px 16px;
-                    font-weight: 500;
-                }}
-                QPushButton:hover {{
-                    background-color: {hover};
-                }}
-                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
-                    width: 18px;
-                    border: none;
-                    background: transparent;
-                }}
                 QDoubleSpinBox::up-arrow {{
                     image: url({up_arrow});
-                    width: 10px;
-                    height: 10px;
                 }}
                 QDoubleSpinBox::down-arrow {{
                     image: url({down_arrow});
-                    width: 10px;
-                    height: 10px;
-                }}
-                QDoubleSpinBox::up-button:hover,
-                QDoubleSpinBox::down-button:hover {{
-                    background-color: {hover};
-                    border-radius: 6px;
                 }}
             """)
 
@@ -281,8 +207,9 @@ class SettingsDialog(QDialog):
     # === Open Settings Folder ===
     def _open_settings_folder(self):
         """Opens the directory containing settings.json, themes.json, and log.txt."""
-        from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+
         from ui.theme_manager import ThemeManager
 
         ThemeManager.ensure_appdir()

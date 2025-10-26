@@ -1,9 +1,9 @@
 import os
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRect, QRectF, Qt, pyqtProperty
+
+from PyQt6.QtCore import (QEasingCurve, QPropertyAnimation, QRect, QRectF, Qt,
+                          pyqtProperty)
 from PyQt6.QtGui import QBrush, QColor, QCursor, QPainter, QPixmap
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtGui import QTransform
-
 
 
 class ToggleSwitch(QPushButton):

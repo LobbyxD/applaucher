@@ -1,14 +1,10 @@
 import asyncio
 import datetime
 import os
-import shlex
 import subprocess
 
-import win32api
 import win32con
-import win32event
-import win32process
-from PyQt6.QtCore import QStandardPaths
+
 try:
     from win32com.shell import shell, shellcon
 except ImportError:

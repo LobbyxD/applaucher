@@ -1,7 +1,10 @@
 # ui/widgets/style_helpers.py
-from PyQt6.QtWidgets import QPushButton, QLineEdit, QDoubleSpinBox, QComboBox
-from ui.theme_manager import ThemeManager
 import os
+
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QLineEdit, QPushButton
+
+from ui.theme_manager import ThemeManager
+
 
 def apply_button_style(btn: QPushButton) -> None:
         """Apply a consistent border, radius, and hover color to PathRow buttons."""
@@ -121,7 +124,7 @@ def apply_spinbox_style(spinbox: QDoubleSpinBox) -> None:
     """)
 
 def apply_combobox_style(combo: QComboBox) -> None:
-    """Final modern combo style consistent with App Launcher theme."""
+    """Unified modern combo style that auto-refreshes on theme change."""
     colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
     base = colors["Base"]
     hover = colors["Hover"]
@@ -130,13 +133,11 @@ def apply_combobox_style(combo: QComboBox) -> None:
     window = colors["Window"]
 
     theme_dir = "dark" if ThemeManager.is_dark() else "light"
-    arrow_down = os.path.join(
-        "resources", "icons", f"{theme_dir} icons", "spin_down.svg"
-    ).replace("\\", "/")
+    arrow_down = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_down.svg").replace("\\", "/")
 
     combo.setStyleSheet(f"""
-        /* === Combo Field === */
         QComboBox {{
+            background-color: {base};
             border: 1px solid {border};
             border-radius: 8px;
             padding: 6px 28px 6px 10px;
@@ -157,22 +158,18 @@ def apply_combobox_style(combo: QComboBox) -> None:
             width: 12px;
             height: 12px;
         }}
-
-        /* === Popup view === */
         QComboBox QAbstractItemView {{
+            background-color: {window};
             border: 1px solid {border};
             border-radius: 8px;
             padding: 4px;
             margin-top: 3px;
             outline: none;
         }}
-
-        /* === Items === */
         QComboBox QAbstractItemView::item {{
             padding: 6px 12px;
             border-radius: 6px;
             color: {text};
-            background: transparent;
         }}
         QComboBox QAbstractItemView::item:hover {{
             background-color: {hover};
@@ -183,3 +180,6 @@ def apply_combobox_style(combo: QComboBox) -> None:
         }}
     """)
 
+    # Ensure it updates live on theme change
+    if hasattr(ThemeManager, "instance"):
+        ThemeManager.instance().theme_changed.connect(lambda _: apply_combobox_style(combo))

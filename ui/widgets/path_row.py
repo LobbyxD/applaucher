@@ -3,19 +3,14 @@ from typing import Any, Dict
 
 from PyQt6 import sip
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QDoubleSpinBox, QFileDialog,
-                             QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QSizePolicy, QWidget)
+from PyQt6.QtWidgets import (QDoubleSpinBox, QFileDialog, QHBoxLayout, QLabel,
+                             QLineEdit, QPushButton, QSizePolicy, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
+from ui.widgets.style_helpers import (apply_button_style, apply_combobox_style,
+                                      apply_input_style, apply_spinbox_style)
 from ui.widgets.themed_combobox import ThemedComboBox
-from ui.widgets.style_helpers import (
-    apply_button_style,
-    apply_input_style,
-    apply_spinbox_style,
-    apply_combobox_style,
-)
 
 MODES = ["Normal", "Maximized", "Minimized"]
 

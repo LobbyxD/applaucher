@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QComboBox, QFrame, QListView
 
 from ui.theme_manager import ThemeManager
 
+
 class ThemedComboBox(QComboBox):
     """Theme-synced combo box with popup that truly matches App Launcher color scheme."""
     def __init__(self, *args, **kwargs):
@@ -96,8 +97,8 @@ class ThemedComboBox(QComboBox):
         super().showPopup()
 
         # --- Apply rounded mask to the popup ---
-        from PyQt6.QtGui import QRegion, QPainterPath
         from PyQt6.QtCore import QRectF
+        from PyQt6.QtGui import QPainterPath, QRegion
 
         popup_rect = QRectF(popup.rect())
         radius = 8

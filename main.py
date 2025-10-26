@@ -8,8 +8,7 @@ from PyQt6.QtWidgets import QApplication
 
 from core.app_settings import APP_SETTINGS
 from core.launcher_logic import run_launch_sequence
-from core.storage import (LAUNCHERS_FILE_NAME, get_data_path, load_launches,
-                          save_launches)
+from core.storage import get_data_path, load_launches, save_launches
 from ui.main_window import MainWindow
 from ui.theme_manager import ThemeManager
 

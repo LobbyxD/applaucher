@@ -1,5 +1,9 @@
-import os, json, subprocess
+import json
+import os
+import subprocess
+
 from PyQt6.QtCore import QStandardPaths
+
 
 def build_single_launcher(name: str, bundle: dict):
     """Builds a standalone .exe launcher for a single App Launch entry."""
