@@ -131,23 +131,20 @@ class MainWindow(QMainWindow):
         root = QVBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 16)
         root.setSpacing(0)
-        app_menu = cast(QMenu, self.menuBar().addMenu("File")) # type: ignore[reportOptionalMemberAccess]
+        app_menu = cast(QMenu, self.menuBar().addMenu("File"))  # type: ignore
         self._apply_menu_style()
 
-
+        # --- File Menu Actions ---
         act_settings = QAction("Settings…", self)
         act_quit = QAction("Quit", self)
-        app_menu.addAction(act_settings)
-        app_menu.addSeparator()
-        app_menu.addAction(act_quit)
-
-        # --- Import / Export Launchers (theme-aware) ---
         self.act_import = QAction("Import Launchers…", self)
         self.act_export = QAction("Export Launchers…", self)
 
+        # Assign icons dynamically
         self.act_import.setIcon(themed_icon("import.svg"))
         self.act_export.setIcon(themed_icon("export.svg"))
 
+        # --- Add to menu (clean, no duplicates) ---
         app_menu.addAction(self.act_import)
         app_menu.addAction(self.act_export)
         app_menu.addSeparator()
@@ -155,10 +152,9 @@ class MainWindow(QMainWindow):
         app_menu.addSeparator()
         app_menu.addAction(act_quit)
 
+        # --- Connect triggers ---
         self.act_import.triggered.connect(self._import_launchers)
         self.act_export.triggered.connect(self._export_launchers)
-
-
         act_settings.triggered.connect(self._open_settings)
         act_quit.triggered.connect(self.close)
 
