@@ -13,7 +13,7 @@ from ui.theme_manager import ThemeManager
 from ui.widgets.draggable_list import DraggableList
 from ui.widgets.path_row import PathRow
 
-MODES = ["Not Maximized", "Maximized", "Minimized"]
+MODES = ["Normal", "Maximized", "Minimized"]
 
 class LaunchEditor(QDialog):
     def __init__(
@@ -201,7 +201,7 @@ class LaunchEditor(QDialog):
 
         # --- Preload rows ---
         for p in (existing["paths"] if existing else []):
-            self._add_row(p.get("path", ""), p.get("delay", 0.0), p.get("start_option", "Not Maximized"))
+            self._add_row(p.get("path", ""), p.get("delay", 0.0), p.get("start_option", "Normal"))
 
         # --- Inner layout ---
         inner = QVBoxLayout(card)

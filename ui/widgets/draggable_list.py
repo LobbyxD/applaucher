@@ -125,7 +125,7 @@ class DraggableList(QListWidget):
         new_widget = PathRow(
             data.get("path", ""),
             data.get("delay", 0.0),
-            data.get("start_option", "Not Maximized"),
+            data.get("start_option", "Normal"),
         )
 
         # Insert at destination

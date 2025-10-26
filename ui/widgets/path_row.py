@@ -1,15 +1,106 @@
 # ui/widgets/path_row.py
+import os
 from typing import Any, Dict
 
-from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QWidget, QSizePolicy)
+                             QSizePolicy, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
 
-MODES = ["Not Maximized", "Maximized", "Minimized"]
+MODES = ["Normal", "Maximized", "Minimized"]
+
+from PyQt6.QtWidgets import QComboBox, QFrame, QListView
+from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtCore import Qt
+from ui.theme_manager import ThemeManager
+
+
+class ThemedComboBox(QComboBox):
+    """Theme-synced combo box with popup that truly matches App Launcher color scheme."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Custom view for styling control
+        view = QListView()
+        view.setSpacing(2)
+        view.setUniformItemSizes(True)
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
+        view.setFrameShape(QFrame.Shape.NoFrame)
+        self.setView(view)
+
+        self._apply_theme_colors()
+
+    def _apply_theme_colors(self):
+        """Applies ThemeManager colors directly to popup palette (ensures consistency)."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+
+        base = QColor(colors["Base"])
+        text = QColor(colors["Text"])
+        window = QColor(colors["Window"])
+        highlight = QColor(colors["Hover"])
+
+        pal = self.palette()
+        pal.setColor(QPalette.ColorRole.Base, base)
+        pal.setColor(QPalette.ColorRole.Window, window)
+        pal.setColor(QPalette.ColorRole.Text, text)
+        pal.setColor(QPalette.ColorRole.ButtonText, text)
+        pal.setColor(QPalette.ColorRole.Highlight, highlight)
+        pal.setColor(QPalette.ColorRole.HighlightedText, text)
+        self.setPalette(pal)
+
+    def showPopup(self):
+        """Ensure popup adopts theme palette and aligns perfectly with combo field."""
+        self._apply_theme_colors()
+        view = self.view()
+        popup = view.window()
+
+        # Window setup (frameless, no system shadow)
+        popup.setWindowFlags(
+            Qt.WindowType.Popup
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint
+        )
+        popup.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        view.setFrameShape(QFrame.Shape.NoFrame)
+
+        # Inject theme-based popup style
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        border = colors["Border"]
+        bg = colors["Base"]
+        hover = colors["Hover"]
+
+        popup.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg};
+                border-radius: 8px;
+            }}
+            QListView::item {{
+                padding: 6px 10px;
+                border-radius: 6px;
+                color: {colors["Text"]};
+            }}
+            QListView::item:hover {{
+                background-color: {hover};
+            }}
+            QListView::item:selected {{
+                background-color: {hover};
+                color: {colors["Text"]};
+            }}
+        """)
+
+        # --- Fix alignment offset ---
+        # Compute popup geometry to start exactly under the combo field
+        popup_rect = self.view().geometry()
+        field_rect = self.rect()
+        global_pos = self.mapToGlobal(field_rect.bottomLeft())
+        popup.move(global_pos.x(), global_pos.y() + 1)  # +1 for subtle gap
+
+        super().showPopup()
 
 
 # ui/widgets/path_row.py
@@ -27,11 +118,12 @@ class PathRow(QWidget):
             delay = float(ThemeManager.get_setting("default_delay", 0))
         if mode is None:
             default_state = ThemeManager.get_setting("default_window_state", "Normal")
-            # Map stored 'Normal' → UI text 'Not Maximized'
-            mode = "Not Maximized" if default_state == "Normal" else default_state
+            # Map stored 'Normal' → UI text 'Normal'
+            mode = "Normal" if default_state == "Normal" else default_state
 
         # --- Widgets ---
         self.path_edit = QLineEdit(path)
+        self._apply_input_style(self.path_edit)
 
         # Browse button
         self.browse_btn = QPushButton()
@@ -43,16 +135,33 @@ class PathRow(QWidget):
 
         # Delay spinbox
         self.delay = QDoubleSpinBox()
+        self._apply_spinbox_style(self.delay)
         self.delay.setRange(0, 9999)
         self.delay.setDecimals(2)
         self.delay.setSuffix(" s")
         self.delay.setValue(float(delay))
 
-        # Mode dropdown
-        self.mode = QComboBox()
+        # Mode dropdown (frameless custom combo)
+        self.mode = ThemedComboBox()
         self.mode.addItems(MODES)
         if mode in MODES:
             self.mode.setCurrentText(mode)
+
+        # --- Mode dropdown (modern themed) ---
+        self.mode = ThemedComboBox()
+        self.mode.addItems(MODES)
+        if mode in MODES:
+            self.mode.setCurrentText(mode)
+
+        # Improved size + font
+        self.mode.setFixedHeight(30)
+        self.mode.setMinimumWidth(120)
+        self.mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mode.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        # Apply theme styling
+        self._apply_combobox_style(self.mode)
+
 
         # Delete button
         self.delete_btn = QPushButton()
@@ -97,7 +206,9 @@ class PathRow(QWidget):
 
         if hasattr(ThemeManager, "instance"):
             ThemeManager.instance().theme_changed.connect(self.refresh_icons)
-            ThemeManager.instance().theme_changed.connect(lambda _: self._refresh_button_styles())
+            ThemeManager.instance().theme_changed.connect(
+                lambda _: (self._refresh_button_styles(), self._apply_combobox_style(self.mode))
+            )
 
     def _refresh_button_styles(self):
         """Reapply button colors when theme toggles."""
@@ -129,6 +240,157 @@ class PathRow(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {hover};
+            }}
+        """)
+
+    def _apply_input_style(self, input_field: QLineEdit):
+        """Modern, theme-aware flat QLineEdit."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        hover = colors["Hover"]
+        border = colors["Border"]
+        text = colors["Text"]
+
+        input_field.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {base};
+                border: 1px solid {border};
+                border-radius: 6px;
+                padding: 6px 8px;
+                color: {text};
+                selection-background-color: {hover};
+                font-size: 13px;
+            }}
+            QLineEdit:hover {{
+                border: 1px solid {hover};
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {hover};
+                background-color: {base};
+            }}
+        """)
+
+    def _apply_spinbox_style(self, spinbox: QDoubleSpinBox):
+        """Modern, flat QDoubleSpinBox styled to match theme."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        hover = colors["Hover"]
+        border = colors["Border"]
+        text = colors["Text"]
+
+        theme_dir = "dark" if ThemeManager.is_dark() else "light"
+        arrow_up = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_up.svg").replace("\\", "/")
+        arrow_down = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_down.svg").replace("\\", "/")
+
+        spinbox.setStyleSheet(f"""
+            QDoubleSpinBox {{
+                background-color: {base};
+                border: 1px solid {border};
+                border-radius: 6px;
+                padding: 4px 22px 4px 8px; /* space for arrows */
+                color: {text};
+                font-size: 13px;
+            }}
+            QDoubleSpinBox:hover {{
+                border: 1px solid {hover};
+            }}
+            QDoubleSpinBox:focus {{
+                border: 1px solid {hover};
+                background-color: {base};
+            }}
+            QDoubleSpinBox::up-button {{
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 18px;
+                border: none;
+                background: transparent;
+            }}
+            QDoubleSpinBox::down-button {{
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 18px;
+                border: none;
+                background: transparent;
+            }}
+            QDoubleSpinBox::up-arrow {{
+                image: url({arrow_up});
+                width: 10px;
+                height: 10px;
+            }}
+            QDoubleSpinBox::down-arrow {{
+                image: url({arrow_down});
+                width: 10px;
+                height: 10px;
+            }}
+            QDoubleSpinBox::up-arrow:hover,
+            QDoubleSpinBox::down-arrow:hover {{
+                background-color: {hover};
+                border-radius: 3px;
+            }}
+        """)
+
+    def _apply_combobox_style(self, combo: QComboBox):
+        """Final modern combo style consistent with App Launcher theme."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        base = colors["Base"]
+        hover = colors["Hover"]
+        border = colors["Border"]
+        text = colors["Text"]
+        window = colors["Window"]
+
+        theme_dir = "dark" if ThemeManager.is_dark() else "light"
+        arrow_down = os.path.join(
+            "resources", "icons", f"{theme_dir} icons", "spin_down.svg"
+        ).replace("\\", "/")
+
+        combo.setStyleSheet(f"""
+            /* === Combo Field === */
+            QComboBox {{
+                background-color: {base};
+                border: 1px solid {border};
+                border-radius: 8px;
+                padding: 6px 28px 6px 10px;
+                color: {text};
+                font-size: 13px;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {hover};
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 22px;
+                background: transparent;
+            }}
+            QComboBox::down-arrow {{
+                image: url({arrow_down});
+                width: 12px;
+                height: 12px;
+            }}
+
+            /* === Popup view === */
+            QComboBox QAbstractItemView {{
+                background-color: {window};
+                border: 1px solid {border};
+                border-radius: 8px;
+                padding: 4px;
+                margin-top: 3px;
+                outline: none;
+            }}
+
+            /* === Items === */
+            QComboBox QAbstractItemView::item {{
+                padding: 6px 12px;
+                border-radius: 6px;
+                color: {text};
+                background: transparent;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {hover};
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {hover};
+                color: {text};
             }}
         """)
 
