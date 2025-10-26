@@ -168,17 +168,27 @@ class MainWindow(QMainWindow):
         content.setSpacing(12)
         root.addLayout(content, 1)
 
-        # --- header row (title + add button) ---
+        # --- header row (centered title + right-aligned add button) ---
         head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(6)
+
         title = QLabel("Launcher List")
-        title.setStyleSheet("font-weight:600; font-size:16px;")
-        head.addWidget(title)
-        head.addStretch(1)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("font-weight:600; font-size:24px;")
 
         self.add_btn = QPushButton()
         self.add_btn.setIcon(themed_icon("add.svg"))
+        self.add_btn.setFixedSize(36, 36)
+        self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add_btn.clicked.connect(self._add)
-        head.addWidget(self.add_btn)
+
+        # Left stretch, centered title, right stretch + button
+        head.addStretch(1)
+        head.addWidget(title, alignment=Qt.AlignmentFlag.AlignCenter)
+        head.addStretch(1)
+        head.addWidget(self.add_btn, alignment=Qt.AlignmentFlag.AlignRight)
+
         content.addLayout(head)
 
         ThemeManager.instance().theme_changed.connect(self.refresh_theme)
