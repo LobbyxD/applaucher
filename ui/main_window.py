@@ -21,6 +21,7 @@ from ui.dialogs.launch_editor import LaunchEditor
 from ui.dialogs.settings_dialog import SettingsDialog
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
+from ui.widgets.style_helpers import apply_label_style, apply_frame_style
 
 
 def _sanitize_filename(name: str) -> str:
@@ -171,7 +172,8 @@ class MainWindow(QMainWindow):
 
         title = QLabel("Launcher List")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-weight:600; font-size:24px;")
+        apply_label_style(title, bold=True, size=24)
+
 
         self.add_btn = QPushButton()
         self.add_btn.setIcon(themed_icon("add.svg"))
@@ -274,22 +276,8 @@ class MainWindow(QMainWindow):
 
     def _apply_list_container_style(self, container: QFrame):
         """Apply theme-based border + background for launcher list area."""
-        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
-        border = colors["Border"]
-        base = colors["Base"]
-        hover = colors["Hover"]
+        apply_frame_style(container, "launcherListContainer")
 
-        container.setStyleSheet(f"""
-            QFrame#launcherListContainer {{
-                border: 1px solid {border};
-                border-radius: 8px;
-                background-color: {base};
-                margin-top: 4px;
-            }}
-            QFrame#launcherListContainer:hover {{
-                border: 1px solid {hover};
-            }}
-        """)
 
 
     def _show_message(self, text: str, duration: int = 3000):

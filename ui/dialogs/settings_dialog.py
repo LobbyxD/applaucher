@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFrame,
                              QHBoxLayout, QLabel, QMessageBox, QPushButton,
                              QSizePolicy, QSpacerItem, QVBoxLayout)
 
-from ui.widgets.style_helpers import apply_combobox_style
+from ui.widgets.style_helpers import (apply_button_style, apply_combobox_style,
+                                      apply_label_style, apply_spinbox_style)
 from ui.widgets.toggle_switch import ToggleSwitch
 
 from ..theme_manager import ThemeManager
@@ -36,7 +37,7 @@ class SettingsDialog(QDialog):
 
         theme_row = QHBoxLayout()
         theme_label = QLabel("Theme")
-        theme_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        apply_label_style(theme_label, bold=True, size=14)
         theme_row.addWidget(theme_label)
         theme_row.addStretch()
 
@@ -57,7 +58,7 @@ class SettingsDialog(QDialog):
         # Default Window State
         state_row = QHBoxLayout()
         state_label = QLabel("Default Window State")
-        state_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        apply_label_style(state_label, bold=True, size=14)
         state_row.addWidget(state_label)
         state_row.addStretch()
         self.state_combo = QComboBox()
@@ -75,7 +76,7 @@ class SettingsDialog(QDialog):
         # Default Delay
         delay_row = QHBoxLayout()
         delay_label = QLabel("Default Delay Between Apps")
-        delay_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        apply_label_style(delay_label, bold=True, size=14)
         delay_row.addWidget(delay_label)
         delay_row.addStretch()
         self.delay_spin = QDoubleSpinBox()
@@ -100,7 +101,7 @@ class SettingsDialog(QDialog):
         # === Minimize to Tray ===
         tray_row = QHBoxLayout()
         tray_label = QLabel("Minimize to Tray on Close")
-        tray_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        apply_label_style(tray_label, bold=True, size=14)
         tray_row.addWidget(tray_label)
         tray_row.addStretch()
 
@@ -115,7 +116,7 @@ class SettingsDialog(QDialog):
         # === Debug Logging (On/Off) ===
         log_row = QHBoxLayout()
         log_label = QLabel("Debug Logging")
-        log_label.setStyleSheet("font-size:14px; font-weight:500; background: transparent;")
+        apply_label_style(log_label, bold=True, size=14)
         log_row.addWidget(log_label)
         log_row.addStretch()
 
@@ -139,6 +140,7 @@ class SettingsDialog(QDialog):
 
         # --- Open Settings Folder Button ---
         open_folder_btn = QPushButton("Open Settings Folder")
+        apply_button_style(open_folder_btn)
         open_folder_btn.setFixedWidth(180)
         open_folder_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         open_folder_btn.clicked.connect(self._open_settings_folder)
@@ -146,6 +148,7 @@ class SettingsDialog(QDialog):
 
         # --- Close Button ---
         close_btn = QPushButton("Close")
+        apply_button_style(close_btn)
         close_btn.setFixedWidth(100)
         close_btn.clicked.connect(self.accept)
         footer.addWidget(close_btn)
@@ -192,7 +195,7 @@ class SettingsDialog(QDialog):
         # Header row
         title_label = QLabel(title)
         title_label.setObjectName("SectionTitle")
-        title_label.setStyleSheet("font-weight: 700; text-decoration: underline;")
+        apply_label_style(title_label, bold=True, size=24)
         layout.addWidget(title_label)
 
         underline = QFrame()

@@ -1,10 +1,10 @@
 # ui/widgets/style_helpers.py
 import os
 
-from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QLineEdit, QPushButton
+from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFrame, QLabel,
+                             QLineEdit, QPushButton, QWidget)
 
 from ui.theme_manager import ThemeManager
-
 
 def apply_button_style(btn: QPushButton) -> None:
         """Apply a consistent border, radius, and hover color to PathRow buttons."""
@@ -183,3 +183,48 @@ def apply_combobox_style(combo: QComboBox) -> None:
     # Ensure it updates live on theme change
     if hasattr(ThemeManager, "instance"):
         ThemeManager.instance().theme_changed.connect(lambda _: apply_combobox_style(combo))
+
+
+def apply_frame_style(frame: QFrame, object_name: str) -> None:
+    """Apply consistent bordered background to frame containers."""
+    colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+    border, base, hover = colors["Border"], colors["Base"], colors["Hover"]
+    frame.setStyleSheet(f"""
+        QFrame#{object_name} {{
+            border: 1px solid {border};
+            border-radius: 8px;
+            background-color: {base};
+            margin-top: 4px;
+        }}
+        QFrame#{object_name}:hover {{
+            border: 1px solid {hover};
+        }}
+    """)
+
+def apply_label_style(label: QLabel, bold=False, underline=False, size=14) -> None:
+    """Apply theme-synced label text style."""
+    colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+    style = f"color: {colors['Text']}; font-size:{size}px;"
+    if bold:
+        style += " font-weight:600;"
+    if underline:
+        style += " text-decoration: underline;"
+    label.setStyleSheet(style)
+    
+def apply_tooltip_style(widget: QWidget) -> None:
+    """Apply consistent theme-aware tooltip styling globally on a widget or window."""
+    colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+    bg = colors["Hover"]
+    text = colors["Text"]
+    border = colors["Border"]
+
+    # Append QToolTip styling to the widget’s existing stylesheet
+    widget.setStyleSheet(widget.styleSheet() + f"""
+        QToolTip {{
+            background-color: {bg};
+            color: {text};
+            border: 1px solid {border};
+            border-radius: 6px;
+            padding: 4px 8px;
+        }}
+    """)

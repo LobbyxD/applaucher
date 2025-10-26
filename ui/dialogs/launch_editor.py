@@ -6,12 +6,15 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (QDialog, QFrame, QGraphicsColorizeEffect,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QPushButton, QSizePolicy,
-                             QToolButton, QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
 from ui.widgets.draggable_list import DraggableList
 from ui.widgets.path_row import PathRow
+from ui.widgets.style_helpers import (apply_button_style, apply_frame_style,
+                                      apply_input_style, apply_label_style,
+                                      apply_tooltip_style)
 
 MODES = ["Normal", "Maximized", "Minimized"]
 
@@ -38,7 +41,6 @@ class LaunchEditor(QDialog):
         self.on_save = on_save
 
         # === Theme setup (define first, call later) ===
-
         def apply_input_theme():
             """Apply theme colors to all QLineEdit and spinbox-like inputs."""
             all_themes = ThemeManager.load_themes()
@@ -85,32 +87,13 @@ class LaunchEditor(QDialog):
                     for edit in row.findChildren(QLineEdit):
                         edit.setStyleSheet(self.default_name_style)
 
-
-        def apply_tooltip_theme():
-            """Apply tooltip color scheme based on current theme."""
-            colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
-            bg = colors["Hover"]
-            text = colors["Text"]
-            border = colors["Border"]
-
-            # Qt’s tooltip uses the global palette stylesheet, so we override globally
-            self.setStyleSheet(self.styleSheet() + f"""
-                QToolTip {{
-                    background-color: {bg};
-                    color: {text};
-                    border: 1px solid {border};
-                    border-radius: 6px;
-                    padding: 4px 8px;
-                }}
-            """)
-
         # === UI setup ===
         card = QFrame()
         card.setObjectName("card")
 
         # --- Name field ---
         name_lbl = QLabel("Launcher Name")
-        name_lbl.setStyleSheet("font-weight: 700;")
+        apply_label_style(name_lbl, bold=True)
         name_container = QFrame()
         name_container.setStyleSheet("border: none;")
         name_layout = QHBoxLayout(name_container)
@@ -125,11 +108,12 @@ class LaunchEditor(QDialog):
 
         # Apply theme after creating name_edit
         apply_input_theme()
-        apply_tooltip_theme()
+        apply_tooltip_style(self)
 
         # Connect live updates
         ThemeManager.instance().theme_changed.connect(
-            lambda _: (apply_input_theme(), apply_tooltip_theme(), self._refresh_button_styles(), self._refresh_list_container())
+            lambda _: (apply_input_theme(), apply_tooltip_style(self),
+                    self._refresh_button_styles(), self._refresh_list_container())
         )
 
         # --- Info icon ---
@@ -160,7 +144,7 @@ class LaunchEditor(QDialog):
         add_btn.setToolTip("Add new path")
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setFixedSize(36, 36)
-        self._apply_button_style(add_btn)
+        apply_button_style(add_btn)
 
         paths_row.addWidget(paths_lbl)
         paths_row.addStretch(1)       # push button to the right
@@ -257,13 +241,14 @@ class LaunchEditor(QDialog):
         inner.addWidget(list_container, 1)
 
         # Apply initial container style
-        self._apply_list_container_style(list_container)
+        apply_frame_style(list_container, "pathListContainer")
+
 
         # --- Footer (inside card) ---
         save_btn = QPushButton("Save")
         cancel_btn = QPushButton("Cancel")
-        self._apply_button_style(save_btn)
-        self._apply_button_style(cancel_btn)
+        apply_button_style(save_btn)
+        apply_button_style(cancel_btn)
         padding = "5 10 5 10"
         margin = "0 0 5 0"
         save_btn.setStyleSheet(f"padding: {padding}px; margin: {margin}px;")
@@ -318,59 +303,18 @@ class LaunchEditor(QDialog):
         cancel_btn.clicked.connect(self.reject)
         save_btn.clicked.connect(self._save)
 
-        # === Shared Styling Helper (theme-aware) ===
-    def _apply_button_style(self, btn: QPushButton):
-        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
-        border = colors["Border"]
-        hover = colors["Hover"]
-        base = colors["Button"]
-        text = colors["ButtonText"]
-
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                border: 1px solid {border};
-                border-radius: 6px;
-                background-color: {base};
-                color: {text};
-                padding: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {hover};
-            }}
-        """)
-
-        # === Themed Path List Container ===
-    def _apply_list_container_style(self, container: QFrame):
-        """Apply theme-based border and background for the path list area."""
-        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
-        border = colors["Border"]
-        base = colors["Base"]
-        hover = colors["Hover"]
-
-        container.setStyleSheet(f"""
-            QFrame#pathListContainer {{
-                border: 1px solid {border};
-                border-radius: 8px;
-                background-color: {base};
-                margin-top: 4px;
-            }}
-            QFrame#pathListContainer:hover {{
-                border: 1px solid {hover};
-            }}
-        """)
-
         # ✅ Set cursor explicitly (Qt API, not QSS)
-        container.setCursor(Qt.CursorShape.ArrowCursor)
+        list_container.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _refresh_button_styles(self):
         for btn in self.findChildren(QPushButton):
-            self._apply_button_style(btn)
+            apply_button_style(btn)
 
     def _refresh_list_container(self):
         """Reapply list container theme when toggled."""
         container = self.findChild(QFrame, "pathListContainer")
         if container:
-            self._apply_list_container_style(container)
+            apply_list_container_style(container)
 
 
     def _flash_name_border(self, duration: int = 3000):
@@ -450,7 +394,7 @@ class LaunchEditor(QDialog):
         w.delete_btn.setIcon(themed_icon("delete.svg"))
         w.delete_btn.setToolTip("Delete this path")
         w.delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._apply_button_style(w.delete_btn)
+        apply_button_style(w.delete_btn)
         w.delete_btn.setFixedSize(32, 32)
         w.delete_btn.clicked.connect(lambda: self.listw.takeItem(self.listw.row(item)))
 
