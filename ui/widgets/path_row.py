@@ -2,6 +2,7 @@
 import os
 from typing import Any, Dict
 
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -12,9 +13,10 @@ from ui.theme_manager import ThemeManager
 
 MODES = ["Normal", "Maximized", "Minimized"]
 
-from PyQt6.QtWidgets import QComboBox, QFrame, QListView
-from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtWidgets import QComboBox, QFrame, QListView
+
 from ui.theme_manager import ThemeManager
 
 
@@ -112,7 +114,7 @@ class PathRow(QWidget):
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         base = colors["Base"]
         alt = colors["Window"]  # usually slightly lighter/darker
-        self.setStyleSheet(f"background-color: {alt}; border-radius: 8px;")
+        self.setStyleSheet("border-radius: 8px;")
 
         if delay is None:
             delay = float(ThemeManager.get_setting("default_delay", 0))
@@ -205,10 +207,25 @@ class PathRow(QWidget):
         self.browse_btn.clicked.connect(self._pick)
 
         if hasattr(ThemeManager, "instance"):
-            ThemeManager.instance().theme_changed.connect(self.refresh_icons)
-            ThemeManager.instance().theme_changed.connect(
-                lambda _: (self._refresh_button_styles(), self._apply_combobox_style(self.mode))
-            )
+            def _is_alive(widget):
+                try:
+                    return widget is not None and not sip.isdeleted(widget)
+                except Exception:
+                    return False
+
+            def _safe_refresh(_=None):
+                # Prevent invalid access after destruction
+                if not _is_alive(self):
+                    return
+                if _is_alive(self.browse_btn):
+                    self._apply_button_style(self.browse_btn)
+                if _is_alive(self.delete_btn):
+                    self._apply_button_style(self.delete_btn)
+                if _is_alive(self.mode):
+                    self._apply_combobox_style(self.mode)
+
+        ThemeManager.instance().theme_changed.connect(_safe_refresh)
+
 
     def _refresh_button_styles(self):
         """Reapply button colors when theme toggles."""
@@ -244,12 +261,16 @@ class PathRow(QWidget):
         """)
 
     def _apply_input_style(self, input_field: QLineEdit):
-        """Modern, theme-aware flat QLineEdit."""
+        """Modern, theme-aware flat QLineEdit with readable selection."""
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         base = colors["Base"]
         hover = colors["Hover"]
         border = colors["Border"]
         text = colors["Text"]
+
+        # Use contrasting text for selection depending on theme
+        selection_bg = hover
+        selection_text = "#ffffff" if ThemeManager.is_dark() else "#000000"
 
         input_field.setStyleSheet(f"""
             QLineEdit {{
@@ -258,7 +279,8 @@ class PathRow(QWidget):
                 border-radius: 6px;
                 padding: 6px 8px;
                 color: {text};
-                selection-background-color: {hover};
+                selection-background-color: {selection_bg};
+                selection-color: {selection_text};
                 font-size: 13px;
             }}
             QLineEdit:hover {{
@@ -271,7 +293,7 @@ class PathRow(QWidget):
         """)
 
     def _apply_spinbox_style(self, spinbox: QDoubleSpinBox):
-        """Modern, flat QDoubleSpinBox styled to match theme."""
+        """Modern, flat QDoubleSpinBox styled to match theme with readable selection."""
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         base = colors["Base"]
         hover = colors["Hover"]
@@ -282,6 +304,9 @@ class PathRow(QWidget):
         arrow_up = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_up.svg").replace("\\", "/")
         arrow_down = os.path.join("resources", "icons", f"{theme_dir} icons", "spin_down.svg").replace("\\", "/")
 
+        selection_bg = hover
+        selection_text = "#ffffff" if ThemeManager.is_dark() else "#000000"
+
         spinbox.setStyleSheet(f"""
             QDoubleSpinBox {{
                 background-color: {base};
@@ -290,6 +315,8 @@ class PathRow(QWidget):
                 padding: 4px 22px 4px 8px; /* space for arrows */
                 color: {text};
                 font-size: 13px;
+                selection-background-color: {selection_bg};
+                selection-color: {selection_text};
             }}
             QDoubleSpinBox:hover {{
                 border: 1px solid {hover};
@@ -411,3 +438,5 @@ class PathRow(QWidget):
             "delay": float(self.delay.value()),
             "start_option": self.mode.currentText(),
         }
+
+

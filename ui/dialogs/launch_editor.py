@@ -179,25 +179,38 @@ class LaunchEditor(QDialog):
         add_btn.clicked.connect(lambda: self._add_row())
 
 
-        # Theme-based selection colors
+        # --- Themed list background and item styling ---
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         base = colors["Base"]
-        hover_bg = colors["Hover"]
-        border_c = colors["Border"]
-        selected_bg = hover_bg if ThemeManager.is_dark() else "#eaeaea"
+        window = colors["Window"]
+        hover = colors["Hover"]
+        border = colors["Border"]
 
         self.listw.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {window};
+                border: 1px solid {border};
+                border-radius: 8px;
+                outline: none;
+            }}
             QListWidget::item {{
-                background: {base};
-                border: 1px solid transparent;
-                margin: 2px;
-                padding: 4px;
+                background: transparent;
+                border: none;
+                margin: 3px;
+                padding: 0px;
             }}
             QListWidget::item:selected {{
-                background: {selected_bg};
-                border: 1px solid {border_c};
+                background-color: transparent;  /* PathRow handles highlight */
+                border: none;
             }}
         """)
+
+        self.listw.setFrameShape(QFrame.Shape.NoFrame)
+        self.listw.setAutoFillBackground(False)
+        self.listw.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+        # Connect selection changes for theme-based highlight
+        self.listw.itemSelectionChanged.connect(self._update_row_selection)
 
         # --- Preload rows ---
         for p in (existing["paths"] if existing else []):
@@ -546,3 +559,19 @@ class LaunchEditor(QDialog):
         if self.on_save:
             self.on_save({"name": name, "paths": valid_paths})
         self.accept()
+
+    def _update_row_selection(self):
+        """Apply theme-based highlight to selected PathRows."""
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        normal_bg = colors["Window"]
+        selected_bg = colors["Hover"]
+
+        for i in range(self.listw.count()):
+            item = self.listw.item(i)
+            row = self.listw.itemWidget(item)
+            if not row:
+                continue
+            row.setStyleSheet(f"""
+                background-color: {selected_bg if item.isSelected() else normal_bg};
+                border-radius: 8px;
+            """)
