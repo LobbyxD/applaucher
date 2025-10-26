@@ -28,15 +28,24 @@ class ThemeManager(QObject):
             "Hover": "#333333"
         },
         "light": {
-            "Window": "#e9e9e9",
-            "Base": "#f2f2f2",
-            "Text": "#202020",
-            "Button": "#f5f5f5",
-            "ButtonText": "#202020",
-            "Border": "#c0c0c0",
-            "Hover": "#d9d9d9"
+            "Window": "#d2d2d2",
+            "Base": "#d9d9d9",
+            "Text": "#1a1a1a",
+            "Button": "#d3d3d3",
+            "ButtonText": "#1a1a1a",
+            "Border": "#9e9e9e",
+            "Hover": "#bfbfbf"
         }
     }
+
+    DEFAULT_SETTINGS = {
+        "theme": "dark",
+        "default_delay": 0,
+        "default_window_state": "Normal",
+        "minimize_to_tray": True,
+        "debug_logging": True
+    }
+
 
     def __new__(cls):
         if cls._instance is None:
@@ -61,17 +70,40 @@ class ThemeManager(QObject):
             with open(ThemeManager.THEMES_FILE, "w", encoding="utf-8") as f:
                 json.dump(ThemeManager.DEFAULT_THEMES, f, indent=2)
 
+    @staticmethod
+    def ensure_default_settings():
+        """If settings.json doesn’t exist, create it with defaults."""
+        ThemeManager.ensure_appdir()
+        if not os.path.exists(ThemeManager.SETTINGS_FILE):
+            with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(ThemeManager.DEFAULT_SETTINGS, f, indent=2)
+
     # === Settings I/O ===
     @staticmethod
     def _load_settings() -> dict:
+        """Load settings.json; create defaults if missing or broken."""
         ThemeManager.ensure_appdir()
-        if os.path.exists(ThemeManager.SETTINGS_FILE):
-            try:
-                with open(ThemeManager.SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return {}
+        ThemeManager.ensure_default_settings()
+
+        try:
+            with open(ThemeManager.SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            # Corrupted file → rewrite defaults
+            with open(ThemeManager.SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(ThemeManager.DEFAULT_SETTINGS, f, indent=2)
+            return ThemeManager.DEFAULT_SETTINGS.copy()
+
+        # 🔁 Auto-fill missing keys (non-destructive update)
+        updated = False
+        for key, value in ThemeManager.DEFAULT_SETTINGS.items():
+            if key not in data:
+                data[key] = value
+                updated = True
+        if updated:
+            ThemeManager._save_settings(data)
+
+        return data
 
     @staticmethod
     def _save_settings(data: dict):
