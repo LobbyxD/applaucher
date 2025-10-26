@@ -3,9 +3,17 @@ import datetime
 import os
 import shlex
 import subprocess
+
+import win32api
 import win32con
+import win32event
 import win32process
 from PyQt6.QtCore import QStandardPaths
+try:
+    from win32com.shell import shell, shellcon
+except ImportError:
+    shell = None
+    shellcon = None
 
 from ui.theme_manager import ThemeManager
 
@@ -42,8 +50,8 @@ def log(message: str, exc: Exception | None = None):
         pass
 
 async def launch_app(path: str, delay: float, start_option: str):
-    """Launch an app or batch file with correct visibility behavior."""
-    # --- Normalize path to handle both quoted/unquoted inputs ---
+    """Launch any file as if double-clicked in Explorer, fully silent (no cmd window)."""
+    # --- Normalize path ---
     path = path.strip().strip('"').strip("'")
 
     si = subprocess.STARTUPINFO()
@@ -56,37 +64,45 @@ async def launch_app(path: str, delay: float, start_option: str):
     else:
         si.wShowWindow = win32con.SW_SHOWNORMAL
 
-    creation_flags = 0
-    if start_option == "Minimized":
-        creation_flags = win32process.DETACHED_PROCESS
+    # --- Launch logic ---
+    try:
+        ext = os.path.splitext(path)[1].lower()
 
-    # Detect .bat files and use cmd /c to run them silently
-
-
-    # --- Handle file types correctly ---
-    if path.lower().endswith(".bat") or path.lower().endswith(".cmd"):
-        subprocess.Popen(
-            ["cmd.exe", "/c", path],
-            startupinfo=si,
-            creationflags=creation_flags
-        )
-    elif path.lower().endswith(".lnk"):
-        # Use Windows shell to open .lnk exactly like double-click
-        try:
-            os.startfile(path)
-        except Exception as e:
-            log(f"❌ Failed to open shortcut {path}", e)
-            raise
-    else:
-        # Normal executable
-        try:
-            subprocess.Popen(shlex.split(path), startupinfo=si, creationflags=creation_flags)
-        except Exception as e:
-            log(f"❌ Failed to launch process {path}", e)
-            raise
+        # 🧩 CASE 1: .bat or .cmd (silent)
+        if ext in (".bat", ".cmd"):
+            # Run batch silently with CREATE_NO_WINDOW
+            CREATE_NO_WINDOW = 0x08000000
+            subprocess.Popen(
+                ["cmd.exe", "/c", path],
+                creationflags=CREATE_NO_WINDOW,
+                startupinfo=si
+            )
 
 
-    # don't delay here, delays handled in sequence
+        # 🧩 CASE 2: .exe or .lnk (apps and shortcuts)
+        elif ext in (".exe", ".lnk"):
+            shell.ShellExecuteEx(
+                fMask=shellcon.SEE_MASK_NO_CONSOLE,
+                lpVerb="open",
+                lpFile=path,
+                nShow=si.wShowWindow
+            )
+
+        # 🧩 CASE 3: Any other file (folder, pdf, image, url, etc.)
+        else:
+            # Use same ShellExecuteEx call to simulate Explorer double-click
+            shell.ShellExecuteEx(
+                fMask=shellcon.SEE_MASK_NO_CONSOLE,
+                lpVerb="open",
+                lpFile=path,
+                nShow=win32con.SW_SHOWNORMAL
+            )
+
+        log(f"✅ Opened silently: {path}")
+
+    except Exception as e:
+        log(f"❌ Failed to open {path}", e)
+        raise
 
 
 async def run_launch_sequence(apps, progress_cb=None):
