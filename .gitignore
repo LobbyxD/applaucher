@@ -78,4 +78,4 @@ pytest_cache/
 # -------------------------------
 .git/
 .gitignore
-
+*.zip

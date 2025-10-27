@@ -233,3 +233,55 @@ def apply_tooltip_style(widget: QWidget) -> None:
 def apply_list_style(list_widget: QListWidget) -> None:
     """Remove QListWidget's default black border without affecting children."""
     list_widget.setStyleSheet("QListWidget { border: none; background: transparent; }")
+
+    
+def apply_titlebar_style(titlebar: QWidget) -> None:
+    """Apply theme-aware, VSCode-style look to the custom title bar."""
+    colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+    bg = colors["Base"]
+    border = colors["Border"]
+    text = colors["Text"]
+    hover = colors["Hover"]
+
+    titlebar.setStyleSheet(f"""
+        QWidget#AppTitleBar {{
+            background-color: {bg};
+            border-bottom: 1px solid {border};
+            padding-top: 3px; 
+        }}
+        QLabel#AppTitle {{
+            color: {text};
+            font-weight: 600;
+        }}
+        QMenuBar#EmbeddedMenuBar {{
+            background-color: transparent;
+            color: {text};
+        }}
+        QMenuBar#EmbeddedMenuBar::item {{
+            background: transparent;
+            padding-top: 2px;   
+            padding-bottom: 2px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }}
+        QMenuBar#EmbeddedMenuBar::item:selected {{
+            background: {hover};
+            border-radius: 4px;
+        }}
+        QWidget#AppTitleBar QPushButton {{
+            color: {text};
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+        }}
+        QWidget#AppTitleBar QPushButton:hover {{
+            background: {hover};
+            border-radius: 4px;
+        }}
+        QWidget#AppTitleBar QPushButton:pressed {{
+            background: {border};
+        }}
+        QWidget#AppTitleBar QPushButton:last-child:hover {{
+            background: #e81123;
+        }}
+    """)

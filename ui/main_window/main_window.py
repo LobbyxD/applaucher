@@ -1,21 +1,19 @@
 # ui/main_window/main_window.py
-from typing import cast
-
 from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QListWidget,
                              QListWidgetItem, QMainWindow, QPushButton,
-                             QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget,  QMenuBar)
 
 from core.app_settings import APP_SETTINGS
 from core.storage import load_launches
-from ui.dialogs.launch_editor import LaunchEditor
 from ui.icon_loader import themed_icon
 # --- Local imports (after split) ---
 from ui.main_window.actions import Actions
-from ui.main_window.launch_worker import LaunchWorker
 from ui.main_window.tray_manager import TrayManager
 from ui.theme_manager import ThemeManager
+from ui.widgets.title_bar import TitleBar
+
 from ui.widgets.style_helpers import (apply_frame_style, apply_label_style,
                                       apply_list_style)
 
@@ -56,6 +54,43 @@ class LaunchListRow(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # --- Make window frameless, we draw our own title bar
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)  # solid app background
+
+        # Keep a central container and stack title bar + your content
+        central = QWidget(self)
+        vbox = QVBoxLayout(central)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(0)
+
+        # 🔹 Set it as central before continuing (so self.centralWidget() works later)
+        self.setCentralWidget(central)
+
+        # Re-create/obtain a menu bar for embedding
+        _native_mb = self.menuBar()              # native menubar (will hide)
+        _native_mb.setVisible(False)             # hide native
+        embedded_mb = QMenuBar(self)             # fresh embedded bar
+
+        # --- MOVE EXISTING MENUS into the embedded bar
+        for a in list(_native_mb.actions()):
+            if a.menu():
+                embedded_mb.addMenu(a.menu())
+            else:
+                embedded_mb.addAction(a)
+
+        # --- Title bar widget
+        app_icon_path = "resources/icons/AppLauncher.ico"
+        app_title = APP_SETTINGS.get("app_name", "App Launcher")
+        self._title_bar = TitleBar(
+                                    self,
+                                    menu_bar=embedded_mb,
+                                    app_icon_path=app_icon_path,
+                                    )
+
+        vbox.addWidget(self._title_bar)
+        self.embedded_menu_bar = embedded_mb
+
         self.setWindowTitle(APP_NAME)
         self.resize(900, 620)
         self.launches = load_launches()
@@ -69,7 +104,7 @@ class MainWindow(QMainWindow):
         self._refresh_list()
 
         # --- Build menu AFTER managers exist ---
-        self.action_mgr.build_menu(self.menuBar())
+        self.action_mgr.build_menu(self.embedded_menu_bar)
 
         # --- Connect signals ---
         ThemeManager.instance().theme_changed.connect(self.refresh_theme)
@@ -77,12 +112,15 @@ class MainWindow(QMainWindow):
     # -----------------------------
     # UI SETUP
     # -----------------------------
+    # -----------------------------
+    # UI SETUP
+    # -----------------------------
     def _build_ui(self):
-        central = QWidget()
-        root = QVBoxLayout(central)
+        """Builds the main content area (below the custom title bar)."""
+        # Create your main content widget
+        self.main_content = QWidget()
+        root = QVBoxLayout(self.main_content)
         root.setContentsMargins(16, 12, 16, 16)
-        self.setCentralWidget(central)
-
 
         # Header
         header = QHBoxLayout()
@@ -104,7 +142,7 @@ class MainWindow(QMainWindow):
         list_container.setObjectName("launcherListContainer")
         list_layout = QVBoxLayout(list_container)
         self.listw = QListWidget()
-        apply_list_style(self.listw) 
+        apply_list_style(self.listw)
         list_layout.addWidget(self.listw)
         root.addWidget(list_container, 1)
         apply_frame_style(list_container, "launcherListContainer")
@@ -113,6 +151,9 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         root.addWidget(self.status_label)
+
+        # ⬇️ Add the content widget (below TitleBar) into the existing vertical layout
+        self.centralWidget().layout().addWidget(self.main_content)
 
     # -----------------------------
     # THEME + STATUS
