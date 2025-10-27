@@ -1,9 +1,8 @@
 # ui/widgets/title_bar.py
-from PyQt6.QtCore import QSize, Qt, QPoint
+from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QSize, Qt
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QMenuBar, QPushButton, QSizePolicy
-)
+from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
+                             QMenuBar, QPushButton, QSizePolicy, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
@@ -84,7 +83,7 @@ class TitleBar(QWidget):
 
 
         # Actions
-        self.btn_min.clicked.connect(self._root.showMinimized)
+        self.btn_min.clicked.connect(self._animate_minimize)
         self.btn_max.clicked.connect(self._toggle_maximize)
         self.btn_close.clicked.connect(self._root.close)
 
@@ -110,13 +109,119 @@ class TitleBar(QWidget):
         widget.mouseReleaseEvent = _release
 
     # --- Behavior ---
+    # --- True Windows maximize / restore animation for frameless window ---
     def _toggle_maximize(self):
-        if self._is_max:
-            self._root.showNormal()
-            self._is_max = False
-            self.btn_max.setIcon(themed_icon("window_maximize.svg"))
-        else:
-            self._root.showMaximized()
-            self._is_max = True
-            self.btn_max.setIcon(themed_icon("window_restore.svg"))
+        """Trigger Windows-native maximize/restore animations with full state sync."""
+        try:
+            import ctypes
+            from ctypes import wintypes
 
+            user32 = ctypes.windll.user32
+            GWL_STYLE = -16
+            WS_CAPTION = 0x00C00000
+            WS_THICKFRAME = 0x00040000
+            WS_MAXIMIZE = 0x01000000
+            WM_SYSCOMMAND = 0x0112
+            SC_MAXIMIZE = 0xF030
+            SC_RESTORE = 0xF120
+
+            hwnd = int(self._root.winId())
+
+            # Read current window style to determine real state
+            style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+            is_really_maximized = bool(style & WS_MAXIMIZE)
+
+            # Temporarily restore WS_CAPTION + WS_THICKFRAME so DWM animates
+            user32.SetWindowLongW(hwnd, GWL_STYLE, style | WS_CAPTION | WS_THICKFRAME)
+
+            if not is_really_maximized:
+                # --- Maximize with native animation ---
+                user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0)
+                self._is_max = True
+                self.btn_max.setIcon(themed_icon("window_restore.svg"))
+            else:
+                # --- Restore (normalize) with native animation ---
+                user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
+                self._is_max = False
+                self.btn_max.setIcon(themed_icon("window_maximize.svg"))
+
+            # Once the state changes, remove native borders again
+            def _restore_styles():
+                # Check current style again after transition
+                s = user32.GetWindowLongW(hwnd, GWL_STYLE)
+                # Only remove caption + frame if not minimized or maximized
+                if not (s & WS_MAXIMIZE):
+                    user32.SetWindowLongW(hwnd, GWL_STYLE, s & ~WS_CAPTION & ~WS_THICKFRAME)
+
+            # Avoid stacking connections — disconnect existing first
+            try:
+                self._root.windowStateChanged.disconnect()
+            except Exception:
+                pass
+            self._root.windowStateChanged.connect(lambda _: _restore_styles())
+
+        except Exception:
+            # fallback to normal Qt behavior on non-Windows
+            if self._is_max:
+                self._root.showNormal()
+                self._is_max = False
+                self.btn_max.setIcon(themed_icon("window_restore.svg"))
+            else:
+                self._root.showMaximized()
+                self._is_max = True
+                self.btn_max.setIcon(themed_icon("window_maximize.svg"))
+
+    # --- True Windows minimize animation for frameless window ---
+    def _animate_minimize(self):
+        """Temporarily restore WS_CAPTION so Windows plays its native animation."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            GWL_STYLE = -16
+            WS_CAPTION = 0x00C00000
+            WS_THICKFRAME = 0x00040000
+            WM_SYSCOMMAND = 0x0112
+            SC_MINIMIZE = 0xF020
+
+            hwnd = int(self._root.winId())
+
+            # 1️⃣  Add normal window styles so DWM can animate
+            style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+            user32.SetWindowLongW(hwnd, GWL_STYLE, style | WS_CAPTION | WS_THICKFRAME)
+
+            # 2️⃣  Ask Windows to minimize (this triggers the system animation)
+            user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0)
+
+            # 3️⃣  After minimize, remove those bits again when restored
+            #     (otherwise the native border will reappear)
+            def _restore_styles():
+                if not self._root.isMinimized():
+                    # remove the caption again once restored
+                    s = user32.GetWindowLongW(hwnd, GWL_STYLE)
+                    user32.SetWindowLongW(hwnd, GWL_STYLE, s & ~WS_CAPTION & ~WS_THICKFRAME)
+
+            self._root.windowStateChanged.connect(lambda _: _restore_styles())
+
+        except Exception:
+            # fallback on non-Windows systems
+            self._root.showMinimized()
+
+    def showEvent(self, e):
+        """Fade in on restore."""
+        if hasattr(self._root, "_fade_effect"):
+            effect = self._root._fade_effect
+            effect.setOpacity(0.0)
+            anim = QPropertyAnimation(effect, b"opacity", self)
+            anim.setDuration(150)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+        super().showEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        """Double-click title bar toggles maximize/restore."""
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._toggle_maximize()
