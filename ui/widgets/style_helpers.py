@@ -2,9 +2,10 @@
 import os
 
 from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFrame, QLabel,
-                             QLineEdit, QPushButton, QWidget)
+                             QLineEdit, QListWidget, QPushButton, QWidget)
 
 from ui.theme_manager import ThemeManager
+
 
 def apply_button_style(btn: QPushButton) -> None:
         """Apply a consistent border, radius, and hover color to PathRow buttons."""
@@ -228,3 +229,7 @@ def apply_tooltip_style(widget: QWidget) -> None:
             padding: 4px 8px;
         }}
     """)
+
+def apply_list_style(list_widget: QListWidget) -> None:
+    """Remove QListWidget's default black border without affecting children."""
+    list_widget.setStyleSheet("QListWidget { border: none; background: transparent; }")
