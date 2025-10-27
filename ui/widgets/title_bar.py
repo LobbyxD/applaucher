@@ -85,7 +85,7 @@ class TitleBar(QWidget):
         # Actions
         self.btn_min.clicked.connect(self._animate_minimize)
         self.btn_max.clicked.connect(self._toggle_maximize)
-        self.btn_close.clicked.connect(self._root.close)
+        self.btn_close.clicked.connect(self._animate_close)
 
         # Apply style
         apply_titlebar_style(self)
@@ -225,3 +225,30 @@ class TitleBar(QWidget):
         """Double-click title bar toggles maximize/restore."""
         if e.button() == Qt.MouseButton.LeftButton:
             self._toggle_maximize()
+
+    # --- True Windows close animation for frameless window ---
+    def _animate_close(self):
+        """Trigger Windows-native close animation using SC_CLOSE."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            GWL_STYLE = -16
+            WS_CAPTION = 0x00C00000
+            WS_THICKFRAME = 0x00040000
+            WM_SYSCOMMAND = 0x0112
+            SC_CLOSE = 0xF060
+
+            hwnd = int(self._root.winId())
+
+            # Restore normal window style so DWM owns it for animation
+            style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+            user32.SetWindowLongW(hwnd, GWL_STYLE, style | WS_CAPTION | WS_THICKFRAME)
+
+            # Ask Windows to perform the native close animation
+            user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0)
+
+        except Exception:
+            # Fallback on non-Windows
+            self._root.close()
