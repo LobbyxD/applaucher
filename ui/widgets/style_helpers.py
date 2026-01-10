@@ -6,9 +6,9 @@ from PyQt6.QtWidgets import (QComboBox, QDoubleSpinBox, QFrame, QLabel,
 
 from ui.theme_manager import ThemeManager
 
-
 def apply_button_style(btn: QPushButton) -> None:
-        """Apply a consistent border, radius, and hover color to PathRow buttons."""
+    """Apply theme-aware button style that automatically updates on theme change."""
+    def _apply():
         colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
         border = colors["Border"]
         hover = colors["Hover"]
@@ -21,12 +21,22 @@ def apply_button_style(btn: QPushButton) -> None:
                 border-radius: 6px;
                 background-color: {base};
                 color: {text};
-                padding: 4px;
+                padding: 4px 10px;
             }}
             QPushButton:hover {{
                 background-color: {hover};
             }}
+            QPushButton:pressed {{
+                background-color: {hover};
+                opacity: 0.9;
+            }}
         """)
+
+    # Apply immediately
+    _apply()
+    # Subscribe for future theme changes
+    ThemeManager.instance().theme_changed.connect(lambda _: _apply())
+
 
 def apply_input_style(input_field: QLineEdit) -> None:
     """Modern, theme-aware flat QLineEdit with readable selection."""
@@ -202,15 +212,26 @@ def apply_frame_style(frame: QFrame, object_name: str) -> None:
         }}
     """)
 
-def apply_label_style(label: QLabel, bold=False, underline=False, size=14) -> None:
-    """Apply theme-synced label text style."""
-    colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
-    style = f"color: {colors['Text']}; font-size:{size}px;"
-    if bold:
-        style += " font-weight:600;"
-    if underline:
-        style += " text-decoration: underline;"
-    label.setStyleSheet(style)
+def apply_label_style(label: QLabel, bold=False, size=12) -> None:
+    """Theme-aware QLabel style that updates automatically on theme change."""
+    def _apply():
+        colors = ThemeManager.load_themes()["dark" if ThemeManager.is_dark() else "light"]
+        text_color = colors.get("Text", "#ffffff" if ThemeManager.is_dark() else "#000000")
+        font_weight = "bold" if bold else "normal"
+        label.setStyleSheet(f"""
+            QLabel {{
+                color: {text_color};
+                font-size: {size}px;
+                font-weight: {font_weight};
+            }}
+        """)
+
+    # Apply immediately
+    _apply()
+
+    # Reapply automatically when theme changes
+    ThemeManager.instance().theme_changed.connect(lambda _: _apply())
+
     
 def apply_tooltip_style(widget: QWidget) -> None:
     """Apply consistent theme-aware tooltip styling globally on a widget or window."""
@@ -285,3 +306,12 @@ def apply_titlebar_style(titlebar: QWidget) -> None:
             background: #e81123;
         }}
     """)
+
+def themed_label(text: str, bold: bool = False, size: int = 12):
+    """Create a QLabel that automatically updates its color when theme changes."""
+    lbl = QLabel(text)
+    apply_label_style(lbl, bold=bold, size=size)
+    ThemeManager.instance().theme_changed.connect(
+        lambda _: apply_label_style(lbl, bold=bold, size=size)
+    )
+    return lbl

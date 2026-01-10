@@ -2,22 +2,21 @@
 from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QListWidget,
-                             QListWidgetItem, QMainWindow, QPushButton,
-                             QVBoxLayout, QWidget,  QMenuBar)
+                             QListWidgetItem, QMainWindow, QMenuBar,
+                             QPushButton, QVBoxLayout, QWidget)
 
 from core.app_settings import APP_SETTINGS
 from core.storage import load_launches
 from ui.icon_loader import themed_icon
-# --- Local imports (after split) ---
 from ui.main_window.actions import Actions
 from ui.main_window.tray_manager import TrayManager
 from ui.theme_manager import ThemeManager
+from ui.widgets.style_helpers import (apply_frame_style, apply_label_style,
+                                      apply_list_style, themed_label)
 from ui.widgets.title_bar import TitleBar
 
-from ui.widgets.style_helpers import (apply_frame_style, apply_label_style,
-                                      apply_list_style)
-
 APP_NAME = APP_SETTINGS["window_title"]
+
 
 # --------------------------------------------------------------------------
 # Row Widget for each launcher
@@ -56,7 +55,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         # --- Make window frameless, we draw our own title bar
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)  # solid app background
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False) 
+        self.setStatusBar(self.statusBar())
+        
 
         # Keep a central container and stack title bar + your content
         central = QWidget(self)
@@ -68,9 +69,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         # Re-create/obtain a menu bar for embedding
-        _native_mb = self.menuBar()              # native menubar (will hide)
-        _native_mb.setVisible(False)             # hide native
-        embedded_mb = QMenuBar(self)             # fresh embedded bar
+        _native_mb = self.menuBar()             
+        _native_mb.setVisible(False)            
+        embedded_mb = QMenuBar(self)           
 
         # --- MOVE EXISTING MENUS into the embedded bar
         for a in list(_native_mb.actions()):
@@ -108,10 +109,68 @@ class MainWindow(QMainWindow):
 
         # --- Connect signals ---
         ThemeManager.instance().theme_changed.connect(self.refresh_theme)
+        self._update_win11_border_theme(ThemeManager.is_dark())
 
-    # -----------------------------
-    # UI SETUP
-    # -----------------------------
+        # --- Enable Windows 11 border, corner radius, and shadow ---
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            dwmapi = ctypes.windll.dwmapi
+
+            hwnd = int(self.winId())
+
+            # 1) Let DWM render window non-client (enables shadow)
+            DWMWA_NCRENDERING_POLICY = 2
+            DWMNCRP_ENABLED = 2
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(DWMWA_NCRENDERING_POLICY),
+                ctypes.byref(wintypes.DWORD(DWMNCRP_ENABLED)),
+                ctypes.sizeof(wintypes.DWORD),
+            )
+
+            # 2) Rounded corners like Win11
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            DWMWCP_ROUND = 2
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(DWMWA_WINDOW_CORNER_PREFERENCE),
+                ctypes.byref(wintypes.DWORD(DWMWCP_ROUND)),
+                ctypes.sizeof(wintypes.DWORD),
+            )
+
+            # 3) Border color mode (dark/light) in sync with ThemeManager
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            dark = ThemeManager.is_dark()
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(DWMWA_USE_IMMERSIVE_DARK_MODE),
+                ctypes.byref(wintypes.BOOL(dark)),
+                ctypes.sizeof(wintypes.BOOL),
+            )
+
+            # ❌ No DwmExtendFrameIntoClientArea here — avoids “dark spots” on opaque windows
+
+        except Exception as e:
+            print(f"⚠️ DWM border effects not applied: {e}")
+
+    def _show_message(self, text: str, timeout: int | None = None):
+        """
+        Show a transient status message.
+        timeout: milliseconds, or None to keep.
+        """
+        if hasattr(self, "statusBar"):
+            if timeout:
+                self.statusBar().showMessage(text, timeout)
+            else:
+                self.statusBar().showMessage(text)
+        else:
+            # fallback (should never happen)
+            print(text)
+
+
+
     # -----------------------------
     # UI SETUP
     # -----------------------------
@@ -124,8 +183,10 @@ class MainWindow(QMainWindow):
 
         # Header
         header = QHBoxLayout()
-        title = QLabel("Launcher List")
-        apply_label_style(title, bold=True, size=24)
+        title = themed_label("Launcher List", bold=True, size=24)
+        ThemeManager.instance().theme_changed.connect(
+            lambda is_dark: apply_label_style(title, bold=True, size=24)
+        )
         self.add_btn = QPushButton()
         self.add_btn.setIcon(themed_icon("add.svg"))
         self.add_btn.setFixedSize(36, 36)
@@ -140,6 +201,7 @@ class MainWindow(QMainWindow):
         # List container
         list_container = QFrame()
         list_container.setObjectName("launcherListContainer")
+        self.list_container = list_container 
         list_layout = QVBoxLayout(list_container)
         self.listw = QListWidget()
         apply_list_style(self.listw)
@@ -158,15 +220,63 @@ class MainWindow(QMainWindow):
     # -----------------------------
     # THEME + STATUS
     # -----------------------------
+
     def refresh_theme(self, is_dark: bool):
+        """Apply app theme assets and sync Windows 11 border style."""
+        # refresh icons
         self.add_btn.setIcon(themed_icon("add.svg"))
         self.action_mgr.refresh_icons()
         for i in range(self.listw.count()):
             row = self.listw.itemWidget(self.listw.item(i))
             row.refresh_icons()
-    def _show_message(self, text: str, duration: int = 3000):
-        self.status_label.setText(text)
-        QTimer.singleShot(duration, lambda: self.status_label.setText(""))
+
+            # re-style theme-aware widgets
+        apply_frame_style(self.list_container, "launcherListContainer") 
+        apply_list_style(self.listw)                                    
+
+        # ✅ Sync Win11 border / dark-mode flag every time theme changes
+        self._update_win11_border_theme(is_dark)
+
+    def _update_win11_border_theme(self, is_dark: bool):
+        """Tell DWM which border mode and color to use (Win11)."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            dwmapi = ctypes.windll.dwmapi
+            hwnd = int(self.winId())
+
+            # Attributes
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            DWMWA_BORDER_COLOR = 34  # Win11 22H2+
+
+            # 1) Flip DWM's dark mode flag
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(DWMWA_USE_IMMERSIVE_DARK_MODE),
+                ctypes.byref(wintypes.BOOL(is_dark)),
+                ctypes.sizeof(wintypes.BOOL),
+            )
+
+            # 2) Set a concrete border color from ThemeManager (prevents wrong halo)
+            colors = ThemeManager.load_themes()["dark" if is_dark else "light"]
+            # Expecting hex like "#RRGGBB"
+            hexcol = colors.get("Border", "#404040").lstrip("#")
+            r = int(hexcol[0:2], 16)
+            g = int(hexcol[2:4], 16)
+            b = int(hexcol[4:6], 16)
+
+            # COLORREF is 0x00BBGGRR
+            colorref = (b << 16) | (g << 8) | r
+            dwmapi.DwmSetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(DWMWA_BORDER_COLOR),
+                ctypes.byref(wintypes.DWORD(colorref)),
+                ctypes.sizeof(wintypes.DWORD),
+            )
+
+        except Exception:
+            # Silently ignore when not on Win11 22H2+ or if DWM isn't available
+            pass
 
     # -----------------------------
     # LIST LOGIC

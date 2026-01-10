@@ -64,35 +64,46 @@ async def launch_app(path: str, delay: float, start_option: str):
     try:
         ext = os.path.splitext(path)[1].lower()
 
-        # 🧩 CASE 1: .bat or .cmd (silent)
-        if ext in (".bat", ".cmd"):
-            # Run batch silently with CREATE_NO_WINDOW
-            CREATE_NO_WINDOW = 0x08000000
-            subprocess.Popen(
-                ["cmd.exe", "/c", path],
-                creationflags=CREATE_NO_WINDOW,
-                startupinfo=si
-            )
+        # # 🧩 CASE 1: .bat or .cmd (silent)
+        # if ext in (".bat", ".cmd"):
+        #     # Run batch silently with CREATE_NO_WINDOW
+        #     CREATE_NO_WINDOW = 0x08000000
+        #     subprocess.Popen(
+        #         ["cmd.exe", "/c", path],
+        #         creationflags=CREATE_NO_WINDOW,
+        #         startupinfo=si
+        #     )
 
 
-        # 🧩 CASE 2: .exe or .lnk (apps and shortcuts)
-        elif ext in (".exe", ".lnk"):
+        # # 🧩 CASE 2: .exe or .lnk (apps and shortcuts)
+        # elif ext in (".exe", ".lnk"):
+        #     shell.ShellExecuteEx(
+        #         fMask=shellcon.SEE_MASK_NO_CONSOLE,
+        #         lpVerb="open",
+        #         lpFile=path,
+        #         nShow=si.wShowWindow
+        #     )
+
+        # # 🧩 CASE 3: Any other file (folder, pdf, image, url, etc.)
+        # else:
+        # Use same ShellExecuteEx call to simulate Explorer double-click
+            # shell.ShellExecuteEx(
+            #     fMask=shellcon.SEE_MASK_NO_CONSOLE,
+            #     lpVerb="open",
+            #     lpFile=path,
+            #     nShow=win32con.SW_SHOWNORMAL
+            # )
+        if shell:
+            bat_dir = os.path.dirname(path)
             shell.ShellExecuteEx(
                 fMask=shellcon.SEE_MASK_NO_CONSOLE,
                 lpVerb="open",
                 lpFile=path,
+                lpDirectory=bat_dir,
                 nShow=si.wShowWindow
             )
-
-        # 🧩 CASE 3: Any other file (folder, pdf, image, url, etc.)
         else:
-            # Use same ShellExecuteEx call to simulate Explorer double-click
-            shell.ShellExecuteEx(
-                fMask=shellcon.SEE_MASK_NO_CONSOLE,
-                lpVerb="open",
-                lpFile=path,
-                nShow=win32con.SW_SHOWNORMAL
-            )
+            os.startfile(path)
 
         log(f"✅ Opened silently: {path}")
 

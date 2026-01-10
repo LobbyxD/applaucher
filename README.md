@@ -89,12 +89,7 @@ and generates a standalone `.exe` inside the `dist/` folder.
 If you prefer to build manually, use:
 
 ```bash
-pyinstaller --onefile --noconsole ^
-  --name "AppLauncher" ^
-  --icon "resources/icons/AppLauncher.ico" ^
-  --add-data "resources/icons;resources/icons" ^
-  --add-data "app_settings.json;." ^
-  main.py
+pyinstaller --onefile --noconsole --name "AppLauncher" --icon "resources/icons/AppLauncher.ico" --add-data "resources/icons;resources/icons" --add-data "app_settings.json;.main.py
 ```
 
 The output executable will appear in:
