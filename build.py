@@ -4,6 +4,16 @@ import os
 import shutil
 import subprocess
 import sys
+import export_folder_hierarchy
+
+def export_project_tree():
+    """
+    Export the folder hierarchy of the current project
+    into the same folder build.py lives in.
+    """
+    project_root = os.getcwd()
+    export_folder_hierarchy.export_hierarchy(project_root)
+
 
 # ----------------- Load config -----------------
 with open("app_settings.json", "r", encoding="utf-8") as f:
@@ -143,6 +153,7 @@ def cleanup_misc():
 
 # ----------------- Entry point -----------------
 if __name__ == "__main__":
+    export_project_tree()
     build()
     sign_exe_if_available()
     prepare_release()

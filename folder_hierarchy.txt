@@ -1,0 +1,136 @@
+App Launcher/
+├── .gitignore
+├── LICENSE
+├── README.md
+├── app_settings.json
+├── build.py
+├── export_folder_hierarchy.py
+├── main.py
+├── make_icon.py
+├── project.zip
+├── requirements-dev.txt
+├── requirements.txt
+├── .git/  # children ignored
+├── .vscode/
+│   └── settings.json
+│
+├── __pycache__/  # children ignored
+├── core/
+│   ├── app_settings.py
+│   ├── exe_builder.py
+│   ├── launcher_logic.py
+│   ├── storage.py
+│   ├── utils.py
+│   └── __pycache__/  # children ignored
+│
+├── dist/
+│   └── AppLauncher.exe
+│
+├── release/
+│   ├── AppLauncher.exe
+│   ├── LICENSE
+│   ├── README.md
+│   ├── app_settings.json
+│   ├── version.txt
+│   └── resources/
+│       ├── resources.qrc
+│       └── icons/
+│           ├── AppLauncher.ico
+│           ├── dark icons/
+│           │   ├── add.svg
+│           │   ├── bars.svg
+│           │   ├── delete.svg
+│           │   ├── edit.svg
+│           │   ├── export.svg
+│           │   ├── folder.svg
+│           │   ├── import.svg
+│           │   ├── info-solid-full.svg
+│           │   ├── moon.svg
+│           │   ├── settings.svg
+│           │   ├── spin_down.svg
+│           │   ├── spin_up.svg
+│           │   ├── window_maximize.svg
+│           │   ├── window_minimize.svg
+│           │   └── window_restore.svg
+│           │
+│           └── light icons/
+│               ├── add.svg
+│               ├── bars.svg
+│               ├── delete.svg
+│               ├── edit.svg
+│               ├── export.svg
+│               ├── folder.svg
+│               ├── import.svg
+│               ├── info-solid-full.svg
+│               ├── settings.svg
+│               ├── spin_down.svg
+│               ├── spin_up.svg
+│               ├── sun.png
+│               ├── window_maximize.svg
+│               ├── window_minimize.svg
+│               └── window_restore.svg
+│
+├── resources/
+│   ├── resources.qrc
+│   └── icons/
+│       ├── AppLauncher.ico
+│       ├── dark icons/
+│       │   ├── add.svg
+│       │   ├── bars.svg
+│       │   ├── delete.svg
+│       │   ├── edit.svg
+│       │   ├── export.svg
+│       │   ├── folder.svg
+│       │   ├── import.svg
+│       │   ├── info-solid-full.svg
+│       │   ├── moon.svg
+│       │   ├── settings.svg
+│       │   ├── spin_down.svg
+│       │   ├── spin_up.svg
+│       │   ├── window_maximize.svg
+│       │   ├── window_minimize.svg
+│       │   └── window_restore.svg
+│       │
+│       └── light icons/
+│           ├── add.svg
+│           ├── bars.svg
+│           ├── delete.svg
+│           ├── edit.svg
+│           ├── export.svg
+│           ├── folder.svg
+│           ├── import.svg
+│           ├── info-solid-full.svg
+│           ├── settings.svg
+│           ├── spin_down.svg
+│           ├── spin_up.svg
+│           ├── sun.png
+│           ├── window_maximize.svg
+│           ├── window_minimize.svg
+│           └── window_restore.svg
+│
+└── ui/
+    ├── icon_loader.py
+    ├── theme_manager.py
+    ├── __pycache__/  # children ignored
+    ├── dialogs/
+    │   ├── launch_editor.py
+    │   ├── settings_dialog.py
+    │   └── __pycache__/  # children ignored
+    │
+    ├── main_window/
+    │   ├── __init__.py  # Empty
+    │   ├── actions.py
+    │   ├── launch_worker.py
+    │   ├── main_window.py
+    │   ├── tray_manager.py
+    │   └── __pycache__/  # children ignored
+    │
+    └── widgets/
+        ├── __init__.py  # Empty
+        ├── draggable_list.py
+        ├── path_row.py
+        ├── style_helpers.py
+        ├── themed_combobox.py
+        ├── title_bar.py
+        ├── toggle_switch.py
+        └── __pycache__/  # children ignored
