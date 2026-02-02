@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, Optional, cast
 
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (QDialog, QFrame, QGraphicsColorizeEffect,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QPushButton, QSizePolicy,
@@ -255,6 +255,16 @@ class LaunchEditor(QDialog):
         save_btn = QPushButton("Save")
         save_btn.setAutoDefault(False)
         save_btn.setDefault(False)
+
+
+        # Ctrl+Enter → Save
+        save_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
+        save_shortcut.activated.connect(save_btn.click)
+
+        # (Optional) also support Ctrl+Enter on numpad
+        save_shortcut2 = QShortcut(QKeySequence("Ctrl+Enter"), self)
+        save_shortcut2.activated.connect(save_btn.click)
+
 
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setAutoDefault(False)
