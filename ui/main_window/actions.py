@@ -2,7 +2,7 @@
 import json
 import os
 import sys
-
+import uuid
 import tempfile
 import shutil
 import pythoncom
@@ -20,6 +20,43 @@ from core.utils import sanitize_filename
 from ui.theme_manager import ThemeManager
 
 APP_NAME = APP_SETTINGS["window_title"]
+
+def _icon_store_dir() -> str:
+    base = os.path.join(os.getenv("APPDATA", ""), "App Launcher", "Icons")
+    os.makedirs(base, exist_ok=True)
+    return base
+
+
+def _ensure_ico(source_path: str, out_name_hint: str) -> str:
+    """
+    Return a path to an .ico file.
+    - If source_path is .ico → return it
+    - Else convert (png/jpg/...) → .ico saved under %APPDATA%\\App Launcher\\Icons
+    """
+    if source_path.lower().endswith(".ico"):
+        return source_path
+
+    # Pillow is the correct tool for this conversion.
+    try:
+        from PIL import Image
+    except Exception as e:
+        raise RuntimeError(
+            "Custom icon requires Pillow. Install with: pip install pillow"
+        ) from e
+
+    out_dir = _icon_store_dir()
+    out_path = os.path.join(out_dir, f"{out_name_hint}.ico")
+
+    img = Image.open(source_path).convert("RGBA")
+
+    # multi-resolution ICO (prevents blurry explorer icons)
+    img.save(
+        out_path,
+        format="ICO",
+        sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
+    )
+
+    return out_path
 
 class Actions:
     def __init__(self, window):
@@ -124,6 +161,49 @@ class Actions:
             final_path = os.path.abspath(os.path.join(desktop, f"{safe}.lnk"))
 
             # ---- resolve target/args/workdir/icon ----
+            # ---- icon selection flow ----
+            # If frozen: default icon should be the EXE icon → do NOT set IconLocation at all (None).
+            # If not frozen (dev): pythonw.exe icon is wrong → we set AppLauncher.ico as default.
+            default_dev_icon = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "resources", "icons", "AppLauncher.ico")
+            )
+
+            # Ask user if they want custom icon
+            reply = QMessageBox.question(
+                self.window,
+                "Shortcut Icon",
+                "Would you like to choose a custom icon for this shortcut?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+            use_custom_icon = (reply == QMessageBox.StandardButton.Yes)
+
+            icon_path_for_shortcut: str | None
+
+            if use_custom_icon:
+                picked, _ = QFileDialog.getOpenFileName(
+                    self.window,
+                    "Choose Icon Image",
+                    "",
+                    "Icon / Images (*.ico *.png *.jpg *.jpeg);;All Files (*.*)",
+                )
+                if not picked:
+                    return  # user canceled → no shortcut created
+
+                safe_hint = sanitize_filename(name) or uuid.uuid4().hex
+                try:
+                    icon_path_for_shortcut = _ensure_ico(picked, safe_hint)
+                except Exception as e:
+                    QMessageBox.critical(self.window, "Icon Error", str(e))
+                    return
+
+            else:
+                # No custom icon:
+                # - Frozen → None (uses the target EXE's embedded icon)
+                # - Dev → use AppLauncher.ico so shortcut looks like the app
+                icon_path_for_shortcut = None if getattr(sys, "frozen", False) else default_dev_icon
+
             if getattr(sys, "frozen", False):
                 pyexe = sys.executable
                 if pyexe.lower().endswith("python.exe"):
@@ -154,7 +234,7 @@ class Actions:
 
             pythoncom.CoInitialize()
             try:
-                _make_lnk(final_path, target, args, workdir, icon_path)
+                _make_lnk(final_path, target, args, workdir, icon_path_for_shortcut)
             finally:
                 pythoncom.CoUninitialize()
 
