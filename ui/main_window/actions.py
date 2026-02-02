@@ -3,6 +3,8 @@ import json
 import os
 import sys
 
+import tempfile
+import shutil
 import pythoncom
 from PyQt6.QtCore import QStandardPaths, Qt, QThread
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox, QDialog
@@ -76,37 +78,91 @@ class Actions:
             self.window._show_message("⚠️ Click delete again to confirm.")
 
     def export_shortcut(self, i):
+        import os
+        import sys
+        import pythoncom
+        from PyQt6.QtCore import QStandardPaths
+        from win32com.shell import shell  # pywin32
+        from win32com.shell import shellcon
+
+        def _make_lnk(lnk_path: str, target: str, args: str, workdir: str, icon_path: str | None):
+            """
+            Create a .lnk using IShellLinkW + IPersistFile (Unicode-safe).
+            Does NOT use WScript.Shell.
+            """
+            # Create ShellLink COM object
+            sl = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink,
+                None,
+                pythoncom.CLSCTX_INPROC_SERVER,
+                shell.IID_IShellLink,
+            )
+
+            sl.SetPath(target)
+            sl.SetArguments(args)
+            sl.SetWorkingDirectory(workdir)
+
+            if icon_path and os.path.exists(icon_path):
+                sl.SetIconLocation(icon_path, 0)
+
+            # Save via IPersistFile (this is the key for Unicode-safe save)
+            pf = sl.QueryInterface(pythoncom.IID_IPersistFile)
+
+            # IPersistFile.Save expects a Unicode string path
+            pf.Save(lnk_path, 0)
+
         try:
             bundle = self.window.launches[i]
             name = bundle.get("name", "Untitled").strip() or "Untitled"
-            safe = sanitize_filename(name)
+            safe = sanitize_filename(name)  # if your sanitize removes Hebrew, consider allowing it
+
+            # Resolve Desktop (handles OneDrive redirected desktop correctly)
             desktop = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
             if not desktop or not os.path.exists(desktop):
                 desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-            shortcut_path = os.path.join(desktop, f"{safe}.lnk")
+
+            final_path = os.path.abspath(os.path.join(desktop, f"{safe}.lnk"))
+
+            # ---- resolve target/args/workdir/icon ----
             if getattr(sys, "frozen", False):
-                target, arguments = sys.executable, f'--launch "{name}"'
-                working_dir = os.path.dirname(sys.executable)
-                icon_path = os.path.join(working_dir, "resources", "icons", "AppLauncher.ico")
+                pyexe = sys.executable
+                if pyexe.lower().endswith("python.exe"):
+                    pyexe = pyexe.replace("python.exe", "pythonw.exe")
+
+                target = pyexe
+                args = f'--launch "{name}"'
+                workdir = os.path.dirname(sys.executable)
+
+                icon_path = os.path.join(workdir, "resources", "icons", "AppLauncher.ico")
                 if not os.path.exists(icon_path) and hasattr(sys, "_MEIPASS"):
                     icon_path = os.path.join(sys._MEIPASS, "resources", "icons", "AppLauncher.ico")
             else:
-                target = sys.executable
-                main_py = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "main.py"))
-                arguments = f'"{main_py}" --launch "{name}"'
-                working_dir = os.path.dirname(main_py)
-                icon_path = os.path.join(os.path.dirname(__file__), "..", "resources", "icons", "AppLauncher.ico")
+                pyexe = sys.executable
+                if pyexe.lower().endswith("python.exe"):
+                    pyexe = pyexe.replace("python.exe", "pythonw.exe")
+
+                target = pyexe
+                main_py = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "main.py"))
+                args = f'"{main_py}" --launch "{name}"'
+                workdir = os.path.dirname(main_py)
+
+                icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "resources", "icons", "AppLauncher.ico"))
+
+            # Ensure no existing broken link blocks save
+            if os.path.exists(final_path):
+                os.remove(final_path)
+
             pythoncom.CoInitialize()
-            shell = Dispatch("WScript.Shell")
-            shortcut = shell.CreateShortcut(shortcut_path)
-            shortcut.TargetPath, shortcut.Arguments, shortcut.WorkingDirectory = target, arguments, working_dir
-            shortcut.Description = f"Launch '{name}' with {APP_NAME}"
-            if os.path.exists(icon_path): shortcut.IconLocation = f"{icon_path},0"
-            shortcut.save()
-            pythoncom.CoUninitialize()
+            try:
+                _make_lnk(final_path, target, args, workdir, icon_path)
+            finally:
+                pythoncom.CoUninitialize()
+
             self.window._show_message(f"Desktop shortcut created: {safe}")
+
         except Exception as e:
             self.window._show_message(f"❌ Export failed: {e}")
+
 
     # -------------------- RUN --------------------
     def run_launcher(self, i):
