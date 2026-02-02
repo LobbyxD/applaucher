@@ -4,7 +4,7 @@ from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QListWidget,
                              QListWidgetItem, QMainWindow, QMenuBar,
-                             QPushButton, QVBoxLayout, QWidget)
+                             QPushButton, QVBoxLayout, QWidget,QStatusBar)
 
 from core.app_settings import APP_SETTINGS
 from core.storage import load_launches
@@ -64,13 +64,27 @@ class MainWindow(QMainWindow):
         # --- Make window frameless, we draw our own title bar
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False) 
-        self.setStatusBar(self.statusBar())
+        self.status_bar = QStatusBar(self)
+        self.setStatusBar(self.status_bar)
+        self.status_bar.setContentsMargins(8, 0, 8, 4)
+        self.status_bar.setSizeGripEnabled(False)
+        self.status_bar.setStyleSheet("QStatusBar { border-top: none; }")
+        # ---- Custom status label (controls spacing & alignment) ----
+        self.status_label = QLabel("")
+        self.status_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.status_label.setContentsMargins(8, 0, 8, 4)
+
+        # Stretch factor 1 pushes it to the right
+        self.status_bar.addPermanentWidget(self.status_label, 1)
+
         
 
         # Keep a central container and stack title bar + your content
         central = QWidget(self)
         vbox = QVBoxLayout(central)
-        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setContentsMargins(0, 0, 0, 6)
         vbox.setSpacing(0)
 
         # 🔹 Set it as central before continuing (so self.centralWidget() works later)
@@ -164,18 +178,11 @@ class MainWindow(QMainWindow):
             print(f"⚠️ DWM border effects not applied: {e}")
 
     def _show_message(self, text: str, timeout: int | None = None):
-        """
-        Show a transient status message.
-        timeout: milliseconds, or None to keep.
-        """
-        if hasattr(self, "statusBar"):
-            if timeout:
-                self.statusBar().showMessage(text, timeout)
-            else:
-                self.statusBar().showMessage(text)
-        else:
-            # fallback (should never happen)
-            print(text)
+        self.status_label.setText(text)
+
+        if timeout:
+            QTimer.singleShot(timeout, lambda: self.status_label.setText(""))
+
 
 
 
@@ -187,7 +194,7 @@ class MainWindow(QMainWindow):
         # Create your main content widget
         self.main_content = QWidget()
         root = QVBoxLayout(self.main_content)
-        root.setContentsMargins(16, 12, 16, 16)
+        root.setContentsMargins(16, 12, 16, 0)
 
         # Header
         header = QHBoxLayout()
@@ -217,10 +224,10 @@ class MainWindow(QMainWindow):
         root.addWidget(list_container, 1)
         apply_frame_style(list_container, "launcherListContainer")
 
-        # Status bar
-        self.status_label = QLabel("")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        root.addWidget(self.status_label)
+        # # Status bar
+        # self.status_label = QLabel("")
+        # self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        # root.addWidget(self.status_label)
 
         # ⬇️ Add the content widget (below TitleBar) into the existing vertical layout
         self.centralWidget().layout().addWidget(self.main_content)
