@@ -28,28 +28,17 @@ def _icon_store_dir() -> str:
 
 
 def _ensure_ico(source_path: str, out_name_hint: str) -> str:
-    """
-    Return a path to an .ico file.
-    - If source_path is .ico → return it
-    - Else convert (png/jpg/...) → .ico saved under %APPDATA%\\App Launcher\\Icons
-    """
     if source_path.lower().endswith(".ico"):
         return source_path
 
-    # Pillow is the correct tool for this conversion.
-    try:
-        from PIL import Image
-    except Exception as e:
-        raise RuntimeError(
-            "Custom icon requires Pillow. Install with: pip install pillow"
-        ) from e
+    from PIL import Image
 
     out_dir = _icon_store_dir()
-    out_path = os.path.join(out_dir, f"{out_name_hint}.ico")
+
+    unique_name = f"{out_name_hint}_{uuid.uuid4().hex}.ico"
+    out_path = os.path.join(out_dir, unique_name)
 
     img = Image.open(source_path).convert("RGBA")
-
-    # multi-resolution ICO (prevents blurry explorer icons)
     img.save(
         out_path,
         format="ICO",
@@ -57,6 +46,7 @@ def _ensure_ico(source_path: str, out_name_hint: str) -> str:
     )
 
     return out_path
+
 
 class Actions:
     def __init__(self, window):
