@@ -11,6 +11,7 @@ from core.launcher_logic import run_launch_sequence
 from core.storage import get_data_path, load_launches, save_launches
 from ui.main_window.main_window import MainWindow
 from ui.theme_manager import ThemeManager
+from core.single_instance import SingleInstance
 
 
 def run_direct_if_requested() -> bool:
@@ -33,6 +34,22 @@ def run_direct_if_requested() -> bool:
         return True
     return False
 
+
+def focus_main_window(window):
+    if not window:
+        return
+
+    window.showNormal()
+    window.raise_()
+    window.activateWindow()
+
+    # 🔥 Windows-specific hard focus
+    if sys.platform == "win32":
+        from core.windows_focus import force_foreground
+        hwnd = int(window.winId())
+        force_foreground(hwnd)
+
+
 if __name__ == "__main__":
     # Handle CLI “headless” mode first
     if run_direct_if_requested():
@@ -40,43 +57,47 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
 
-        # === First-run setup ===
+    # 🔒 SINGLE INSTANCE ENFORCEMENT (RIGHT HERE)
+    instance = SingleInstance()
 
+    if instance.is_running():
+        # Another instance exists → it was already focused
+        sys.exit(0)
 
-    # Ensure AppData directories & defaults exist
+    # === First-run setup ===
     ThemeManager.ensure_appdir()
     ThemeManager.ensure_default_themes()
     ThemeManager.ensure_default_settings()
     ThemeManager.lock_config_files()
 
-    # Ensure launchers_config.json exists (using global name)
     launches_file = get_data_path()
     if not os.path.exists(launches_file):
         try:
-            save_launches([])  # create empty file
+            save_launches([])
         except Exception as e:
             print(f"⚠️ Could not initialize launch data: {e}")
-
-
 
     icon_path = os.path.join(os.path.dirname(__file__), APP_SETTINGS["icon_path"])
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
-    # Create main window first
+    # ✅ Create main window
     w = MainWindow()
+
+    # 🔁 Now that window exists — start listening for focus requests
+    instance.start_server(lambda: focus_main_window(w))
+
     if os.path.exists(icon_path):
         w.setWindowIcon(QIcon(icon_path))
 
-    # 🔹 Now apply the saved theme (after widgets exist)
     theme_value = ThemeManager.get_setting("theme", "dark")
     ThemeManager.apply_theme(theme_value)
 
     w.show()
 
-    # 🔹 Force a repaint of all widgets (ensures no residual flicker)
     for widget in app.topLevelWidgets():
         widget.update()
         widget.repaint()
 
     sys.exit(app.exec())
+

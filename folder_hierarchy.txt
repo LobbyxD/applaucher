@@ -20,8 +20,10 @@ App Launcher/
 │   ├── exe_builder.py
 │   ├── launcher_logic.py
 │   ├── resource_path.py
+│   ├── single_instance.py
 │   ├── storage.py
 │   ├── utils.py
+│   ├── windows_focus.py
 │   └── __pycache__/  # children ignored
 │
 ├── dist/
