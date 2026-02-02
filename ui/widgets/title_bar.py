@@ -1,13 +1,13 @@
 # ui/widgets/title_bar.py
 from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QSize, Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon,QPixmap
 from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
                              QMenuBar, QPushButton, QSizePolicy, QWidget)
 
 from ui.icon_loader import themed_icon
 from ui.theme_manager import ThemeManager
 from ui.widgets.style_helpers import apply_titlebar_style
-
+from core.resource_path import resource_path
 
 class TitleBar(QWidget):
     """VS Code–style title bar with icon, menu, and window buttons."""
@@ -26,7 +26,15 @@ class TitleBar(QWidget):
         # === Left: App icon ===
         icon_lbl = QLabel()
         if app_icon_path:
-            icon_lbl.setPixmap(QIcon(app_icon_path).pixmap(18, 18))
+            path = resource_path(app_icon_path)
+            pix = QPixmap(path)
+            if not pix.isNull():
+                icon_lbl.setPixmap(pix.scaled(
+                    18, 18,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                ))
+
         icon_lbl.setFixedSize(QSize(20, 20))
 
         # === Middle: Menu bar ===

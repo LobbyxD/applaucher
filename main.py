@@ -65,6 +65,8 @@ if __name__ == "__main__":
 
     # Create main window first
     w = MainWindow()
+    if os.path.exists(icon_path):
+        w.setWindowIcon(QIcon(icon_path))
 
     # 🔹 Now apply the saved theme (after widgets exist)
     theme_value = ThemeManager.get_setting("theme", "dark")

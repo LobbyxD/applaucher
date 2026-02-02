@@ -1,4 +1,5 @@
 # ui/main_window/main_window.py
+import os, sys
 from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QListWidget,
@@ -14,9 +15,16 @@ from ui.theme_manager import ThemeManager
 from ui.widgets.style_helpers import (apply_frame_style, apply_label_style,
                                       apply_list_style, themed_label)
 from ui.widgets.title_bar import TitleBar
+from core.resource_path import resource_path
 
 APP_NAME = APP_SETTINGS["window_title"]
 
+
+
+def resource_path(rel_path: str) -> str:
+    if getattr(sys, "frozen", False):
+        return os.path.join(sys._MEIPASS, rel_path)
+    return os.path.join(os.path.dirname(__file__), "..", "..", rel_path)
 
 # --------------------------------------------------------------------------
 # Row Widget for each launcher

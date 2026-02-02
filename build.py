@@ -49,40 +49,56 @@ def safe_remove(path):
 
 # ----------------- Build process -----------------
 def build():
-    """Compile the PyQt app into a single .exe"""
-    print(f"🚀 Building {EXE_NAME}.exe …")
+    """Compile the PyQt app exactly like launcher.py build"""
 
-    # Clean temp dirs first for a fully fresh build
+    print(f"🚀 Building {EXE_NAME} (onedir, launcher-style)…")
+
+    # Clean temp dirs
     safe_rmtree(DIST_DIR)
     safe_rmtree(BUILD_DIR)
 
     pyi_cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--onefile",
-        "--noconsole",
+
+        # === MATCH launcher.py build ===
+        "--onedir",                # IMPORTANT
+        "--windowed",              # GUI app (NOT --noconsole)
+        "--noconfirm",
         "--clean",
-        f"--icon={ICON_PATH}",
-        f"--add-data={INCLUDE_RES}",
-        "--add-data=app_settings.json;.",
+
         f"--name={EXE_NAME}",
+        f"--icon={ICON_PATH}",
+
+        # Qt & deps (CRITICAL)
+        "--collect-all", "qtawesome",
+        "--collect-all", "PyQt6",
+        "--hidden-import", "qtpy",
+        "--hidden-import", "typing_extensions",
+
+        # Resources
+        "--add-data=app_settings.json;.",
+        "--add-data=resources;resources",
+
         "main.py",
     ]
 
     run(pyi_cmd)
 
-    exe_src = os.path.join(DIST_DIR, f"{EXE_NAME}.exe")
-    if not os.path.exists(exe_src):
-        raise FileNotFoundError(f"❌ Expected built exe not found: {exe_src}")
+    exe_dir = os.path.join(DIST_DIR, EXE_NAME)
+    exe_path = os.path.join(exe_dir, f"{EXE_NAME}.exe")
 
-    # Delete the automatically generated spec file — not needed
+    if not os.path.exists(exe_path):
+        raise FileNotFoundError(f"❌ Expected built exe not found: {exe_path}")
+
+    # Delete auto spec
     safe_remove(f"{EXE_NAME}.spec")
 
-    print("✅ PyInstaller build OK (spec file deleted).")
+    print("✅ PyInstaller build OK (launcher-compatible).")
 
 # ----------------- Optional: Code signing -----------------
 def sign_exe_if_available():
     """Optional: sign exe if signtool.exe exists (skips silently otherwise)."""
-    exe_path = os.path.join(DIST_DIR, f"{EXE_NAME}.exe")
+    exe_path = os.path.join(DIST_DIR, EXE_NAME, f"{EXE_NAME}.exe")
     signtool_path = r"C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
     if not os.path.exists(signtool_path):
         print("ℹ️ signtool.exe not found — skipping code signing.")
@@ -113,8 +129,8 @@ def prepare_release():
     ensure_dir(RELEASE_DIR)
 
     # Copy built exe
-    exe_src = os.path.join(DIST_DIR, f"{EXE_NAME}.exe")
-    shutil.copy(exe_src, os.path.join(RELEASE_DIR, f"{EXE_NAME}.exe"))
+    exe_dir = os.path.join(DIST_DIR, EXE_NAME)
+    shutil.copytree(exe_dir, os.path.join(RELEASE_DIR, EXE_NAME))
 
     # Copy necessary top-level files
     for fname in ["app_settings.json", "LICENSE", "README.md"]:
