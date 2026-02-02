@@ -93,7 +93,14 @@ class MainWindow(QMainWindow):
         # Re-create/obtain a menu bar for embedding
         _native_mb = self.menuBar()             
         _native_mb.setVisible(False)            
-        embedded_mb = QMenuBar(self)           
+        embedded_mb = QMenuBar(self)  
+        embedded_mb = QMenuBar(self)
+        embedded_mb.setStyleSheet("""
+        QMenuBar::item {
+            padding-left: 0px;
+            padding-right: 6px;
+        }
+        """)        
 
         # --- MOVE EXISTING MENUS into the embedded bar
         for a in list(_native_mb.actions()):
