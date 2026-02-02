@@ -144,7 +144,14 @@ class LaunchEditor(QDialog):
         add_btn.setToolTip("Add new path")
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setFixedSize(36, 36)
+
+        # ✅ CRITICAL: don't let Enter trigger "+"
+        add_btn.setAutoDefault(False)
+        add_btn.setDefault(False)
+        add_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
         apply_button_style(add_btn)
+
 
         paths_row.addWidget(paths_lbl)
         paths_row.addStretch(1)       # push button to the right
@@ -178,7 +185,7 @@ class LaunchEditor(QDialog):
         self.listw.setCursor(Qt.CursorShape.ArrowCursor)
         self.listw.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-        add_btn.clicked.connect(lambda: self._add_row())
+        add_btn.clicked.connect(self._on_add_clicked)
 
 
         # --- Themed list background and item styling ---
@@ -246,7 +253,12 @@ class LaunchEditor(QDialog):
 
         # --- Footer (inside card) ---
         save_btn = QPushButton("Save")
+        save_btn.setAutoDefault(False)
+        save_btn.setDefault(False)
+
         cancel_btn = QPushButton("Cancel")
+        cancel_btn.setAutoDefault(False)
+        cancel_btn.setDefault(False)
         apply_button_style(save_btn)
         apply_button_style(cancel_btn)
         padding = "5 10 5 10"
@@ -306,6 +318,31 @@ class LaunchEditor(QDialog):
         # ✅ Set cursor explicitly (Qt API, not QSS)
         list_container.setCursor(Qt.CursorShape.ArrowCursor)
 
+    def _on_add_clicked(self):
+        """
+        Add a new row only if the last row has a non-empty path.
+        Keeps '+' behavior consistent with Enter key UX.
+        """
+        count = self.listw.count()
+
+        # No rows yet → allow add
+        if count == 0:
+            self._add_row(focus=True)
+            return
+
+        last_item = self.listw.item(count - 1)
+        last_row = self.listw.itemWidget(last_item)
+
+        if not last_row:
+            return
+
+        path = (last_row.path_edit.text() or "").strip()
+        if not path:
+            return  # ❌ block empty-row spam
+
+        self._add_row(focus=True)
+
+
     def _refresh_button_styles(self):
         for btn in self.findChildren(QPushButton):
             apply_button_style(btn)
@@ -313,8 +350,8 @@ class LaunchEditor(QDialog):
     def _refresh_list_container(self):
         """Reapply list container theme when toggled."""
         container = self.findChild(QFrame, "pathListContainer")
-        if container:
-            apply_list_container_style(container)
+        # if container:
+        #     apply_list_container_style(container)
 
 
     def _flash_name_border(self, duration: int = 3000):
@@ -383,11 +420,18 @@ class LaunchEditor(QDialog):
         anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
 
+    def _on_row_request_add_next(self, row: PathRow):
+        # Extra safety: only add if current row path isn't empty
+        if not (row.path_edit.text() or "").strip():
+            return
+
+        self._add_row(focus=True)
 
     # --- Helper to add new path rows ---
-    def _add_row(self, path=None, delay=None, mode=None):
+    def _add_row(self, path=None, delay=None, mode=None, *, focus=False):
         item = QListWidgetItem(self.listw)
         w = PathRow(path or "", delay, mode)
+        w.request_add_next.connect(lambda w=w: self._on_row_request_add_next(w))
         item.setSizeHint(QSize(0, 50))
         self.listw.addItem(item)
         self.listw.setItemWidget(item, w)
@@ -397,6 +441,8 @@ class LaunchEditor(QDialog):
         apply_button_style(w.delete_btn)
         w.delete_btn.setFixedSize(32, 32)
         w.delete_btn.clicked.connect(lambda: self.listw.takeItem(self.listw.row(item)))
+        if focus:
+            QTimer.singleShot(0, lambda: w.path_edit.setFocus())
 
     # --- Inline message helper ---
     def _show_inline_message(self, text: str, color: str = "#f39c12", duration: Optional[int] = None):

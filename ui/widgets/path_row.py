@@ -2,7 +2,7 @@
 from typing import Any, Dict
 
 from PyQt6 import sip
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (QDoubleSpinBox, QFileDialog, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QSizePolicy, QWidget)
 
@@ -16,6 +16,7 @@ MODES = ["Normal", "Maximized", "Minimized"]
 
 # ui/widgets/path_row.py
 class PathRow(QWidget):
+    request_add_next = pyqtSignal()
     def __init__(self, path: str = "", delay: float = None, mode: str = None):
         super().__init__()
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
@@ -34,6 +35,8 @@ class PathRow(QWidget):
 
         # --- Widgets ---
         self.path_edit = QLineEdit(path)
+        self.path_edit.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.path_edit.returnPressed.connect(self._on_return_pressed)
         apply_input_style(self.path_edit)
 
         # Browse button
@@ -128,6 +131,12 @@ class PathRow(QWidget):
 
         ThemeManager.instance().theme_changed.connect(_safe_refresh)
 
+    def _on_return_pressed(self):
+        path = (self.path_edit.text() or "").strip()
+        if not path:
+            return  # empty → do nothing
+
+        self.request_add_next.emit()  # valid → ask parent to add a row
 
     def _refresh_button_styles(self):
         """Reapply button colors when theme toggles."""
