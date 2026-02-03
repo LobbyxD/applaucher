@@ -44,6 +44,7 @@ App Launcher/
 │           ├── _queue.pyd
 │           ├── _socket.pyd
 │           ├── _ssl.pyd
+│           ├── _uuid.pyd
 │           ├── _wmi.pyd
 │           ├── _zstd.pyd
 │           ├── api-ms-win-core-console-l1-1-0.dll
@@ -100,6 +101,14 @@ App Launcher/
 │           ├── select.pyd
 │           ├── ucrtbase.dll
 │           ├── unicodedata.pyd
+│           ├── PIL/
+│           │   ├── _avif.cp314-win_amd64.pyd
+│           │   ├── _imaging.cp314-win_amd64.pyd
+│           │   ├── _imagingcms.cp314-win_amd64.pyd
+│           │   ├── _imagingmath.cp314-win_amd64.pyd
+│           │   ├── _imagingtk.cp314-win_amd64.pyd
+│           │   └── _webp.cp314-win_amd64.pyd
+│           │
 │           ├── PyQt6/
 │           │   ├── QAxContainer.pyd
 │           │   ├── QAxContainer.pyi
@@ -4015,6 +4024,7 @@ App Launcher/
 │   │       ├── _queue.pyd
 │   │       ├── _socket.pyd
 │   │       ├── _ssl.pyd
+│   │       ├── _uuid.pyd
 │   │       ├── _wmi.pyd
 │   │       ├── _zstd.pyd
 │   │       ├── api-ms-win-core-console-l1-1-0.dll
@@ -4071,6 +4081,14 @@ App Launcher/
 │   │       ├── select.pyd
 │   │       ├── ucrtbase.dll
 │   │       ├── unicodedata.pyd
+│   │       ├── PIL/
+│   │       │   ├── _avif.cp314-win_amd64.pyd
+│   │       │   ├── _imaging.cp314-win_amd64.pyd
+│   │       │   ├── _imagingcms.cp314-win_amd64.pyd
+│   │       │   ├── _imagingmath.cp314-win_amd64.pyd
+│   │       │   ├── _imagingtk.cp314-win_amd64.pyd
+│   │       │   └── _webp.cp314-win_amd64.pyd
+│   │       │
 │   │       ├── PyQt6/
 │   │       │   ├── QAxContainer.pyd
 │   │       │   ├── QAxContainer.pyi
