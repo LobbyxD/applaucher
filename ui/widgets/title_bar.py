@@ -27,15 +27,16 @@ class TitleBar(QWidget):
         icon_lbl = QLabel()
         if app_icon_path:
             path = resource_path(app_icon_path)
-            pix = QPixmap(path)
-            if not pix.isNull():
-                icon_lbl.setPixmap(pix.scaled(
-                    18, 18,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                ))
+            # Use QIcon.pixmap() so the .ico's best matching size is chosen
+            icon = QIcon(path)
+            pm = icon.pixmap(QSize(24, 24))
+            if not pm.isNull():
+                icon_lbl.setPixmap(pm)
 
-        icon_lbl.setFixedSize(QSize(20, 20))
+        # Larger fixed size so the icon appears crisp and centered
+        # icon_lbl.setFixedSize(QSize(32, 32))
+        icon_lbl.setScaledContents(False)
+        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # === Middle: Menu bar ===
         self.menu_bar = menu_bar or QMenuBar(self)

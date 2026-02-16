@@ -19,3 +19,16 @@ def themed_icon(name: str) -> QIcon:
         print(f"⚠️ Missing icon: {icon_path}")
         return QIcon()
     return QIcon(icon_path)
+
+
+def load_app_icon(icon_path: str) -> QIcon:
+    """Load app icon directly without any scaling or transformation."""
+    import sys
+    if not os.path.isabs(icon_path):
+        if getattr(sys, "frozen", False):
+            icon_path = os.path.join(sys._MEIPASS, icon_path)
+        else:
+            icon_path = os.path.join(os.path.dirname(__file__), "..", icon_path)
+    if os.path.exists(icon_path):
+        return QIcon(icon_path)
+    return QIcon()

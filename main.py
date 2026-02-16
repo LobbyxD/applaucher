@@ -5,6 +5,7 @@ import sys
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QSize
 
 from core.app_settings import APP_SETTINGS
 from core.launcher_logic import run_launch_sequence
@@ -79,7 +80,8 @@ if __name__ == "__main__":
 
     icon_path = os.path.join(os.path.dirname(__file__), APP_SETTINGS["icon_path"])
     if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+        icon = QIcon(icon_path)
+        app.setWindowIcon(icon)
 
     # ✅ Create main window
     w = MainWindow()
